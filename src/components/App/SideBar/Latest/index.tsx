@@ -1,9 +1,11 @@
 import { Button } from '@mui/material'
-import { memo } from 'react'
+import { memo, useCallback, useEffect, useRef } from 'react'
+import { Socket } from 'socket.io-client'
 import styled from 'styled-components'
 import { Flex } from '~/components/common/Flex'
 import BrowseGalleryIcon from '~/components/Icons/BrowseGalleryIcon'
 import DownloadIcon from '~/components/Icons/DownloadIcon'
+import useSocket from '~/hooks/useSockets'
 import { useDataStore } from '~/stores/useDataStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { colors } from '~/utils/colors'
@@ -17,6 +19,27 @@ type Props = {
 const _View = ({ isSearchResult }: Props) => {
   const [nodeCount, setNodeCount, setBudget] = useUserStore((s) => [s.nodeCount, s.setNodeCount, s.setBudget])
   const [fetchData] = [useDataStore((s) => s.fetchData)]
+
+  const socket: Socket | null = useSocket()
+
+  const handleNewNode = useCallback(() => {
+    setNodeCount('INCREMENT')
+  }, [setNodeCount])
+
+  const isSocketSet: { current: boolean } = useRef<boolean>(false)
+
+  // setup socket
+  useEffect(() => {
+    if (isSocketSet.current) {
+      return
+    }
+
+    if (socket) {
+      socket.on('newnode', handleNewNode)
+
+      isSocketSet.current = true
+    }
+  }, [socket, handleNewNode])
 
   const getLatest = async () => {
     if (nodeCount < 1) {

@@ -8,25 +8,18 @@ const useSocket = (): Socket | null => {
   const [socket, setSocket] = useState<Socket | null>(null)
 
   useEffect(() => {
-    let socketInstance: Socket | null = socket
+    console.log('We are trying to connect here')
 
-    if (!socket) {
-      console.log('We are trying to connect here')
+    const socketInstance = io(API_URL)
 
-      socketInstance = io(API_URL)
-
-      setSocket(socketInstance)
-    }
+    setSocket(socketInstance)
 
     return () => {
       console.log('I want to see what happens here')
 
-      if (socketInstance) {
-        socketInstance.disconnect()
-        setSocket(null)
-      }
+      socketInstance.disconnect()
     }
-  }, [socket])
+  }, [])
 
   return socket
 }
