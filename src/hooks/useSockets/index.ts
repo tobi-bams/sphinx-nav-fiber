@@ -23,9 +23,8 @@ const useSocket = (): Socket | null => {
 
       if (socketInstance) {
         socketInstance.disconnect()
+        setSocket(null)
       }
-
-      setSocket(null)
     }
   }, [socket])
 
