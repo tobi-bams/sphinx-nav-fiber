@@ -20,7 +20,7 @@ const useSocket = (): Socket | null => {
     return () => {
       console.log('I want to see what happens here')
       isMounted.current = false
-      socketInstance.disconnect()
+      // socketInstance.disconnect()
     }
   }, [])
 
