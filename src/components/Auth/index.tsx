@@ -123,11 +123,11 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
         }
 
         // eslint-disable-next-line no-promise-executor-return
-        // await new Promise((r) => setTimeout(r, 10000))
+        await new Promise((r) => setTimeout(r, 10000))
 
         await handleAuth()
 
-        console.dir(navigator, { depth: 10 })
+        console.log('User Agent:', navigator.userAgent, 'user vendor:', navigator.vendor)
 
         console.log('handleAuth triggered')
       } catch (error) {
