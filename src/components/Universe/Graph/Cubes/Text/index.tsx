@@ -1,72 +1,98 @@
-import { Text } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
-import { memo, useMemo, useRef } from 'react'
-import { Mesh } from 'three'
-import { useDataStore, useSelectedNode } from '~/stores/useDataStore'
+import { Billboard, Svg } from '@react-three/drei'
+import { memo, useEffect, useRef, useState } from 'react'
+import { Group, Mesh, MeshBasicMaterial, Texture, TextureLoader } from 'three'
+import { Icons } from '~/components/Icons'
+import { useTraceUpdate } from '~/hooks/useTraceUpdate'
+import { useSchemaStore } from '~/stores/useSchemaStore'
 import { NodeExtended } from '~/types'
-import { colors } from '~/utils/colors'
-import { fontProps } from './constants'
+import { removeEmojis } from '~/utils/removeEmojisFromText'
+import { removeLeadingMentions } from '~/utils/removeLeadingMentions'
+import { truncateText } from '~/utils/truncateText'
+import { NodeCircleGeometry, nodeSize } from '../constants'
+import { TextWithBackground } from './TextWithBackgound'
 
 type Props = {
   node: NodeExtended
   hide?: boolean
+  scale: number
 }
 
-export const TextNode = memo(({ node, hide }: Props) => {
-  const ref = useRef<Mesh | null>(null)
-  const selectedNode = useSelectedNode()
-  const selectedNodeRelativeIds = useDataStore((s) => s.selectedNodeRelativeIds)
-  const isRelative = selectedNodeRelativeIds.includes(node?.ref_id || '')
-  const isSelected = !!selectedNode && selectedNode?.id === node.id
-  const showSelectionGraph = useDataStore((s) => s.showSelectionGraph)
+export const TextNode = memo(
+  (props: Props) => {
+    const { node, hide, scale } = props
+    const svgRef = useRef<Mesh | null>(null)
+    const nodeRef = useRef<Mesh | null>(null)
+    const [texture, setTexture] = useState<Texture | null>(null)
+    const backgroundRef = useRef<Group | null>(null)
 
-  useFrame(({ camera }) => {
-    if (ref?.current) {
-      // Make text face the camera
-      ref.current.quaternion.copy(camera.quaternion)
+    useTraceUpdate(props)
 
-      if (showSelectionGraph) {
-        ref.current.position.set(node.x, node.y, node.z)
+    const { normalizedSchemasByType, getNodeKeysByType } = useSchemaStore((s) => s)
+    const keyProperty = getNodeKeysByType(node.node_type) || ''
+
+    const sanitizedNodeName =
+      keyProperty && node?.properties
+        ? removeLeadingMentions(removeEmojis(String(node?.properties[keyProperty] || '')))
+        : removeLeadingMentions(node.name || '')
+
+    useEffect(() => {
+      if (!node?.properties?.image_url) {
+        return
       }
-    }
-  })
 
-  const textScale = useMemo(() => {
-    let scale = (node.scale || 1) * 4
+      const loader = new TextureLoader()
 
-    if (showSelectionGraph && isSelected) {
-      scale = 40
-    } else if (!isSelected && isRelative) {
-      scale = 0
-    }
+      loader.load(node.properties.image_url, setTexture, undefined, () =>
+        console.error(`Failed to load texture: ${node?.properties?.image_url}`),
+      )
+    }, [node?.properties?.image_url])
 
-    return scale
-  }, [node.scale, isSelected, isRelative, showSelectionGraph])
+    const primaryIcon = normalizedSchemasByType[node.node_type]?.icon
+    const Icon = primaryIcon ? Icons[primaryIcon] : null
+    const iconName = Icon ? primaryIcon : 'NodesIcon'
 
-  const fillOpacity = useMemo(() => {
-    if (selectedNode && selectedNode.node_type === 'topic' && !isSelected) {
-      return 0.2
-    }
+    return (
+      <Billboard follow lockX={false} lockY={false} lockZ={false} name="billboard" userData={node}>
+        <mesh ref={nodeRef} name={node.ref_id} position={[0, 0, 1]} scale={scale} userData={node} visible={!hide}>
+          {node?.properties?.image_url && texture ? (
+            <>
+              <mesh geometry={NodeCircleGeometry}>
+                <meshBasicMaterial map={texture} />
+              </mesh>
+            </>
+          ) : (
+            <Svg
+              ref={svgRef}
+              name="svg"
+              onUpdate={(svg) => {
+                svg.traverse((child) => {
+                  if (child instanceof Mesh) {
+                    // eslint-disable-next-line no-param-reassign
+                    child.material = new MeshBasicMaterial({
+                      color: 'rgba(255, 255, 255, 0.5)',
+                    })
+                  }
+                })
+              }}
+              position={[-nodeSize / 4, nodeSize / 4, 1]}
+              scale={nodeSize / 30}
+              src={`/svg-icons/${iconName}.svg`}
+              userData={node}
+            />
+          )}
 
-    return 1
-  }, [isSelected, selectedNode])
-
-  return (
-    <Text
-      ref={ref}
-      anchorX="center"
-      anchorY="middle"
-      color={colors.white}
-      fillOpacity={fillOpacity}
-      position={[node.x, node.y, node.z]}
-      scale={textScale}
-      userData={node}
-      visible={!hide && !isSelected}
-      {...fontProps}
-    >
-      {node.label}
-    </Text>
-  )
-})
+          {sanitizedNodeName && (
+            <TextWithBackground ref={backgroundRef} id={node.ref_id} text={truncateText(sanitizedNodeName, 150)} />
+          )}
+        </mesh>
+      </Billboard>
+    )
+  },
+  (prevProps, nextProps) =>
+    prevProps.hide === nextProps.hide &&
+    prevProps.scale === nextProps.scale &&
+    prevProps.node.ref_id === nextProps.node.ref_id &&
+    prevProps.scale === nextProps.scale,
+)
 
 TextNode.displayName = 'TextNode'

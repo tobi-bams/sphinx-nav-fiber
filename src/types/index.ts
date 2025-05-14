@@ -1,10 +1,88 @@
 /* eslint-disable camelcase */
 import { Mesh, Vector3 } from 'three'
 
+type QueryData = {
+  ref_id: string
+  project_id?: string
+}
+
+export type FetchNodeParams = {
+  word?: string
+  skip_cache?: string
+  free?: string
+  media_type?: string
+  force_regenerate?: boolean
+}
+
+export type Node = {
+  boost?: number | null
+  children?: string[]
+  x: number
+  y: number
+  z: number
+  edge_count: number
+  hidden?: boolean
+  colors?: string[]
+  date?: number
+  date_added_to_graph?: number
+  description?: string
+  episode_title?: string
+  hosts?: Guests[]
+  guests?: (null | string | Guests)[]
+  id?: string
+  image_url?: string
+  sender_pic?: string
+  sender_alias?: string
+  message_content?: string
+  keyword?: boolean
+  label: string
+  source_link?: string
+  link?: string
+  name: string
+  node_type: string
+  ref_id: string
+  scale?: number
+  show_title?: string
+  text?: string
+  timestamp?: string
+  topics?: string[]
+  type?: string
+  weight?: number
+  tweet_id?: string
+  posted_by?: PostedBy
+  twitter_handle?: string
+  profile_picture?: string
+  verified?: boolean
+  unique_id?: string
+  properties?: { [key: string]: never | undefined }
+  media_url?: string
+  start?: number
+  end?: number
+  longitude?: number
+  latitude?: number
+  coordinates?: Coordinates
+  audio?: Audio[]
+  neighbourHood?: string
+}
+
 export type FetchDataResponse = {
-  data_series?: { title: string }
-  exact: Node[]
-  related: Node[]
+  nodes: Node[]
+  edges: Link[]
+  query_data?: QueryData
+}
+
+export type FilterParams = {
+  skip: number
+  limit: number
+  depth: string
+  includeContent: string
+  sort_by: string
+  top_node_count: string
+  include_properties: string
+  node_type: string[]
+  search_method: string
+  free?: string
+  word?: string // Add other optional filter properties as needed
 }
 
 export type TEdge = {
@@ -12,8 +90,6 @@ export type TEdge = {
   ref_id: string
   search_value: string
 }
-
-export type FetchTrendingResponse = Trending[]
 
 export type FetchSentimentResponse = {
   data: Sentiment[]
@@ -44,51 +120,21 @@ export type RadarRequest = {
 }
 
 export type NodeRequest = {
-  muted_topic?: boolean
-  topic?: string
-  name?: string
-  image_url?: string
+  node_type?: string
+  node_data: {
+    name?: string
+    is_muted?: boolean
+    topic?: string
+    image_url?: string
+  }
 }
 
-export type Node = {
-  boost?: number | null
-  children?: string[]
-  x: number
-  y: number
-  z: number
-  hidden?: boolean
-  colors?: string[]
-  date?: number
-  description?: string
-  episode_title?: string
-  hosts?: Guests[]
-  guests?: (null | string | Guests)[]
-  id?: string
-  image_url?: string
-  sender_pic?: string
-  sender_alias?: string
-  message_content?: string
-  keyword?: boolean
-  label: string
-  source_link?: string
-  link?: string
-  name: string
+export type NodeEditRequest = {
   node_type: string
-  ref_id?: string
-  scale?: number
-  show_title?: string
-  text?: string
-  timestamp?: string
-  topics?: string[]
-  type?: string
-  weight?: number
-  tweet_id?: string
-  posted_by?: PostedBy
-  twitter_handle?: string
-  profile_picture?: string
-  verified?: boolean
-  unique_id?: string
-  properties?: { [key: string]: never }
+  ref_id: string
+  properties: {
+    [key: string]: unknown
+  }
 }
 
 export type DataSeriesNode = {
@@ -123,27 +169,35 @@ export type NodeExtended = Node & {
   x?: number
   y?: number
   z?: number
-  longitude?: number
-  latitude?: number
-  coordinates?: Coordinates
-  audio?: Audio[]
+  fx?: number
+  fy?: number
+  fz?: number
+  sources?: string[]
+  targets?: string[]
+  edgeTypes?: string[]
 }
 
 export type Link<T = string> = {
   index?: T extends string ? never : number
+  start?: number
+  end?: number
   source: T
   target: T
   color?: number
+  ref_id: string
   sourceRef?: T
   targetRef?: T
+  edge_type: string
   sourcePosition?: Vector3
   targetPosition?: Vector3
   onlyVisibleOnSelect?: boolean
+  properties?: { [key: string]: unknown }
+  attributes?: { [key: string]: unknown }
 }
 
 export type GraphData<T = string> = {
   links: Link<T>[]
-  nodes: NodeExtended[]
+  nodes: Node[]
 }
 
 export class NodeMesh extends Mesh {
@@ -187,7 +241,7 @@ export type Topic = {
   name: string
   node_type: string
   ref_id: string
-  muted_topic: string
+  is_muted: string
   edgeList: Array<string>
   edgeCount: number
   date_added_to_graph: string
@@ -195,7 +249,7 @@ export type Topic = {
 
 export type TopicFilter = {
   search?: string
-  muted: boolean
+  is_muted: boolean
   sortBy: string
   page: number
   pageSize: number
@@ -205,12 +259,8 @@ export type SubmitErrRes = {
   error?: { message?: string }
   data: {
     ref_id: string
+    project_id?: string
   }
-}
-
-export type AuthRequest = {
-  message: string
-  signature: string
 }
 
 export type IsAdminResponse = {
@@ -221,6 +271,12 @@ export type IsAdminResponse = {
     trendingTopics: boolean
     queuedSources: boolean
     customSchema: boolean
+    realtimeGraph: boolean
+    chatInterface: boolean
+    chatSplashScreenAsDefault: boolean
+    swarmUiUrl: string
+    fastFilters: boolean
+    title: string
   }
   success: boolean
   message: string
@@ -241,14 +297,7 @@ export type BalanceResponse = {
 }
 
 export type TStats = {
-  numAudio?: string
-  numContributors?: string
-  numDaily?: string
-  numEpisodes?: string
-  numNodes?: string
-  numTwitterSpace?: string
-  numVideo?: string
-  numDocuments?: string
+  [key: string]: number
 }
 
 export type RelayUser = {
@@ -265,4 +314,59 @@ export type RelayUser = {
   proxy_ip?: string
   admin_token?: string
   routeHint?: string
+}
+
+export type AiSummaryAnswerResponse = {
+  question: string
+  answer: string
+  ref_id: string
+}
+
+export type AiSummarySourcesResponse = {
+  question: string
+  sources: { ref_id: string }[]
+  ref_id: string
+}
+
+export type AiSummaryQuestionsResponse = {
+  question: string
+  relevant_questions: { question: string }[]
+  ref_id: string
+}
+
+export type AIEntity = {
+  question?: string
+  answer?: string
+  sources?: string[]
+  questions?: string[]
+  answerLoading?: boolean
+  sourcesLoading?: boolean
+  questionsLoading?: boolean
+  hasBeenRendered?: boolean
+  entities?: ExtractedEntity[]
+  shouldRender?: boolean
+  audio_en?: string
+}
+
+export interface ExtractedEntity {
+  entity: string
+  description: string
+}
+
+export interface ExtractedEntitiesResponse {
+  ref_id: string
+  question: string
+  entities: ExtractedEntity[]
+}
+
+export type AiSummaryAudioResponse = {
+  ref_id: string
+  audio_EN: string
+}
+
+export type ActionDetail = {
+  bounty: boolean
+  display_name: string
+  name: string
+  workflow_id: string
 }

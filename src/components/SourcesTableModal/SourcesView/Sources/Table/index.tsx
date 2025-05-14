@@ -1,9 +1,11 @@
 import { Table as MaterialTable, TableBody, TableRow } from '@mui/material'
 import React, { useState } from 'react'
-import { MdCheck, MdClose, MdDeleteForever, MdOutlineModeEdit } from 'react-icons/md'
+import { MdCheck, MdClose } from 'react-icons/md'
 import { ClipLoader } from 'react-spinners'
 import styled from 'styled-components'
 import { BaseTextInput } from '~/components/BaseTextInput'
+import DeleteIcon from '~/components/Icons/DeleteIcon'
+import EditIcon from '~/components/Icons/EditIcon'
 import NoFilterResultIcon from '~/components/Icons/NoFilterResultIcon'
 import ConfirmPopover from '~/components/common/ConfirmPopover'
 import { Flex } from '~/components/common/Flex'
@@ -121,11 +123,17 @@ const Table: React.FC<Props> = ({ data, canEdit = false }) => {
               <StyledTableCell align="left">
                 <div className="delete-wrapper" id={`delete-${i.source}`}>
                   {loadingId === i.ref_id ? (
-                    <ClipLoader color={colors.white} />
+                    <ClipLoaderWrapper data-testid={`delete-loader-${i.ref_id}`}>
+                      <ClipLoader color={colors.white} size={16} />
+                    </ClipLoaderWrapper>
                   ) : (
-                    <ConfirmPopover message="Are you sure ?" onConfirm={() => handleRemove(i.ref_id)}>
-                      <IconWrapper className="centered">
-                        <MdDeleteForever />
+                    <ConfirmPopover
+                      data-testid={`delete-icon-${i.ref_id}`}
+                      message="Are you sure?"
+                      onConfirm={() => handleRemove(i.ref_id)}
+                    >
+                      <IconWrapper className="centered" data-testid={`delete-icon-${i.ref_id}`}>
+                        <DeleteIcon />
                       </IconWrapper>
                     </ConfirmPopover>
                   )}
@@ -180,7 +188,7 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, id, children
   return (
     <div>
       {editing ? (
-        <EditModeCellWrapper direction="row">
+        <EditModeCellWrapper align="center" direction="row">
           <BaseTextInput
             className="editable-cell__input"
             name="cell-input"
@@ -188,7 +196,13 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, id, children
             value={name}
           />
           <IconWrapper align="center" justify="center">
-            {loading ? <ClipLoader /> : <MdCheck onClick={handleSave} />}
+            {loading ? (
+              <ClipLoaderWrapper data-testid={`edit-loader-${id}`}>
+                <ClipLoader color={colors.white} size={12} />
+              </ClipLoaderWrapper>
+            ) : (
+              <MdCheck data-testid={`check-icon-${id}`} onClick={handleSave} />
+            )}
           </IconWrapper>
           <IconWrapper align="center" className="secondary" justify="center" onClick={() => setEditing(false)}>
             <MdClose />
@@ -196,9 +210,10 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, id, children
         </EditModeCellWrapper>
       ) : (
         <EditableCellWrapper direction="row">
-          {children}
+          <div className="name">{children}</div>
+          <div className="spacer" />
           <IconWrapper onClick={() => setEditing(true)}>
-            <MdOutlineModeEdit size={20} />
+            <EditIcon data-testid={`edit-icon-${id}`} />
           </IconWrapper>
         </EditableCellWrapper>
       )}
@@ -231,13 +246,20 @@ const IconWrapper = styled(Flex)`
   border-radius: 50%;
   cursor: pointer;
   background: transparent;
-  color: ${colors.lightBlue500};
+  align-items: center;
+  justify-content: center;
+  display: flex;
   &.centered {
     margin: 0 auto;
+    color: ${colors.secondaryRed};
   }
 
   & + & {
     margin-left: 4px;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
   }
 `
 
@@ -258,28 +280,46 @@ const NoResultWrapper = styled(Flex)`
     letter-spacing: 0em;
     color: ${colors.GRAY6};
   }
+
+  svg {
+    color: ${colors.GRAY6};
+  }
 `
 
 const EditableCellWrapper = styled(Flex)`
   display: flex;
   padding: 4px;
   position: relative;
+  width: 100%;
+  align-items: center;
 
-  ${IconWrapper} {
-    visibility: hidden;
+  .name {
+    flex: 1;
   }
 
-  &:hover {
-    ${IconWrapper} {
-      visibility: visible;
-    }
+  .spacer {
+    flex: 1;
   }
 `
 
 const StyledLink = styled.a`
   color: ${colors.white};
   text-decoration: underline;
+  max-width: 400px;
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   &:visited {
     color: ${colors.white};
   }
+  &:hover {
+    color: ${colors.SOURCE_TABLE_LINK};
+  }
+`
+
+const ClipLoaderWrapper = styled(Flex)`
+  display: flex;
+  justify-content: center;
+  align-items: center;
 `

@@ -63,7 +63,18 @@ export const BudgetStep: FC<Props> = ({ onClick, loading, type, error }) => {
           disabled={loading || !!error}
           onClick={onClick}
           size="large"
-          startIcon={loading ? <ClipLoader size={24} /> : <CheckIcon />}
+          startIcon={
+            loading ? (
+              <IconWrapper>
+                <ClipLoader color={colors.lightGray} size={12} />
+              </IconWrapper>
+            ) : (
+              <IconWrapper>
+                {' '}
+                <CheckIcon />
+              </IconWrapper>
+            )
+          }
           type="submit"
           variant="contained"
         >
@@ -71,12 +82,11 @@ export const BudgetStep: FC<Props> = ({ onClick, loading, type, error }) => {
         </Button>
       </Flex>
       {error ? (
-        <StyledError role="tooltip">
+        <StyledError>
           <StyledErrorText>
-            <MdError fontSize={13} />
+            <MdError className="errorIcon" />
             <span>{error}</span>
           </StyledErrorText>
-          <div className="tooltip">{error}</div>
         </StyledError>
       ) : null}
     </Flex>
@@ -138,21 +148,31 @@ const StyledText = styled(Text)`
 `
 
 const StyledErrorText = styled(Flex)`
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: normal;
-  letter-spacing: 0.2px;
-  cursor: pointer;
-  padding-left: 4px;
-  font-size: 13px;
-  font-family: Barlow;
-  line-height: 18px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   justify-content: center;
+  gap: 2px;
+
+  .errorIcon {
+    display: block;
+    font-size: 13px;
+    min-height: 13px;
+    min-width: 13px;
+  }
 
   span {
-    margin-left: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    padding-left: 4px;
+    font-size: 13px;
+    font-family: Barlow;
+    line-height: 18px;
   }
 `
 
@@ -162,28 +182,16 @@ const StyledError = styled(Flex)`
   color: ${colors.primaryRed};
   position: relative;
   margin-top: 20px;
+`
 
-  .tooltip {
-    position: absolute;
-    background-color: ${colors.black};
-    opacity: 0.8;
-    border-radius: 4px;
-    color: ${colors.white};
-    top: -10px;
-    left: 335px;
-    padding: 4px 8px;
-    font-size: 13px;
-    font-family: Barlow;
-    visibility: hidden;
-    width: 175px;
-    z-index: 1;
-  }
+const IconWrapper = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
 
-  &:hover .tooltip {
-    visibility: visible;
-  }
-
-  &:focus .tooltip {
-    visibility: visible;
+  svg {
+    width: 16px;
+    height: 16px;
   }
 `

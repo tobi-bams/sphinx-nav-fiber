@@ -1,15 +1,13 @@
 import clsx from 'clsx'
 import { ReactElement } from 'react'
 import styled from 'styled-components'
+import { useShallow } from 'zustand/react/shallow'
 import BubbleChartIcon from '~/components/Icons/BubbleChartIcon'
 import CommunitiesIcon from '~/components/Icons/CommunitiesIcon'
 import GrainIcon from '~/components/Icons/GrainIcon'
-import NodesIcon from '~/components/Icons/NodesIcon'
 import PublicIcon from '~/components/Icons/PublicIcon'
 import { Flex } from '~/components/common/Flex'
-import { GraphStyle, graphStyles, useDataStore } from '~/stores/useDataStore'
-import { useFeatureFlagStore } from '~/stores/useFeatureFlagStore'
-import { useUserStore } from '~/stores/useUserStore'
+import { GraphStyle, graphStyles, useGraphStore } from '~/stores/useGraphStore'
 import { colors } from '~/utils/colors'
 
 interface IconsMapper {
@@ -17,7 +15,6 @@ interface IconsMapper {
   force: ReactElement
   sphere: ReactElement
   earth: ReactElement
-  v2: ReactElement
 }
 
 const IconsMapper = {
@@ -25,37 +22,24 @@ const IconsMapper = {
   force: <CommunitiesIcon />,
   sphere: <BubbleChartIcon />,
   earth: <PublicIcon />,
-  v2: <NodesIcon />,
 }
 
 export const GraphViewControl = () => {
-  const [graphStyle, setGraphStyle] = useDataStore((s) => [s.graphStyle, s.setGraphStyle])
-  const [v2Flag, setV2Flag] = useFeatureFlagStore((s) => [s.v2Flag, s.setV2Flag])
-  const [isAdmin] = useUserStore((s) => [s.isAdmin])
+  const [graphStyle, setGraphStyle] = useGraphStore(useShallow((s) => [s.graphStyle, s.setGraphStyle]))
 
   const changeGraphType = (val: GraphStyle) => {
     setGraphStyle(val)
-    setV2Flag(false)
   }
 
-  return (
+  return false ? (
     <Wrapper direction="column">
       {graphStyles.map((i) => (
-        <Flex
-          key={i}
-          className={clsx('icon', { active: graphStyle === i && !v2Flag })}
-          onClick={() => changeGraphType(i)}
-        >
+        <Flex key={i} className={clsx('icon', { active: graphStyle === i })} onClick={() => changeGraphType(i)}>
           {IconsMapper[i]}
         </Flex>
       ))}
-      {isAdmin && (
-        <Flex className={clsx('icon', { active: v2Flag })} onClick={() => setV2Flag(true)}>
-          {IconsMapper.v2}
-        </Flex>
-      )}
     </Wrapper>
-  )
+  ) : null
 }
 
 const Wrapper = styled(Flex).attrs({
@@ -63,14 +47,15 @@ const Wrapper = styled(Flex).attrs({
   align: 'center',
   justify: 'space-between',
 })`
-  padding: 6px 6px 6px 11px;
-  background: ${colors.BG1};
-  border-radius: 200px;
-  margin-top: 16px;
+  width: 447px;
+  height: 48px;
+  background: ${colors.appearanceBg};
+  border-radius: 6px;
   .icon {
     color: ${colors.GRAY6};
     font-size: 20px;
     cursor: pointer;
+    padding: 12px 20px;
 
     &:hover {
       color: ${colors.GRAY3};
@@ -82,6 +67,9 @@ const Wrapper = styled(Flex).attrs({
 
     &.active {
       color: ${colors.white};
+      background: ${colors.primaryBlue};
+      padding: 12px 20px;
+      border-radius: 6px;
     }
   }
 

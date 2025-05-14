@@ -5,19 +5,40 @@ import styled from 'styled-components'
 import { Avatar } from '~/components/common/Avatar'
 import { Flex } from '~/components/common/Flex'
 import { usePlayerStore } from '~/stores/usePlayerStore'
-import { colors } from '~/utils'
+import { colors, videoTimeToSeconds } from '~/utils'
 import { Toolbar } from './ToolBar'
+import { useSelectedNode } from '~/stores/useGraphStore'
 
 type Props = {
   hidden: boolean
 }
 
+type FullScreenProps = {
+  isFullScreen: boolean
+}
+
 const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
   const playerRef = useRef<ReactPlayer | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const [isFocused, setIsFocused] = useState(false)
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [isMouseNearBottom, setIsMouseNearBottom] = useState(false)
   const [status, setStatus] = useState<'buffering' | 'error' | 'ready'>('ready')
+  const [isReady, setIsReady] = useState(false)
+  const [NodeStartTime, setNodeStartTime] = useState<string>('')
+  const [hasSeekedToStart, setHasSeekedToStart] = useState(false)
+  const selectedNode = useSelectedNode()
+
+  useEffect(() => {
+    const customKeys = selectedNode?.properties || {}
+
+    const timestampEntry = Object.entries(customKeys).find(([key]) => key === 'timestamp')
+
+    const timestamp = timestampEntry ? timestampEntry[1] : ('' as string)
+    const startTime = timestamp?.split('-')[0] as string
+
+    setNodeStartTime(startTime)
+  }, [selectedNode])
 
   const {
     isPlaying,
@@ -35,7 +56,21 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
     setIsSeeking,
   } = usePlayerStore((s) => s)
 
+  const mediaUrl =
+    playingNode?.media_url || playingNode?.link || playingNode?.properties?.link || playingNode?.properties?.media_url
+
+  const isYouTubeVideo = mediaUrl?.includes('youtube') || mediaUrl?.includes('youtu.be')
+
   useEffect(() => () => resetPlayer(), [resetPlayer])
+
+  useEffect(() => {
+    if (playingNode && !isReady) {
+      setPlayingTime(0)
+      setDuration(0)
+      setIsReady(false)
+      setHasSeekedToStart(false)
+    }
+  }, [playingNode, setPlayingTime, setDuration, setIsReady, isReady])
 
   useEffect(() => {
     if (isSeeking && playerRef.current) {
@@ -43,6 +78,16 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
       setIsSeeking(false)
     }
   }, [playingTime, isSeeking, setIsSeeking])
+
+  useEffect(() => {
+    if (isReady && NodeStartTime && playerRef.current && !hasSeekedToStart) {
+      const startTimeInSeconds = videoTimeToSeconds(NodeStartTime)
+
+      playerRef.current.seekTo(startTimeInSeconds, 'seconds')
+      setPlayingTime(startTimeInSeconds)
+      setHasSeekedToStart(true)
+    }
+  }, [isReady, NodeStartTime, setPlayingTime, hasSeekedToStart])
 
   const togglePlay = () => {
     setIsPlaying(!isPlaying)
@@ -59,9 +104,10 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
   const handleProgressChange = (_: Event, value: number | number[]) => {
     const newValue = Array.isArray(value) ? value[0] : value
 
-    if (playerRef.current) {
-      playerRef.current.seekTo(newValue)
-      setPlayingTime(newValue)
+    setPlayingTime(newValue)
+
+    if (playerRef.current && !isSeeking) {
+      playerRef.current.seekTo(newValue, 'seconds')
     }
   }
 
@@ -91,6 +137,14 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
       const videoDuration = playerRef.current.getDuration()
 
       setDuration(videoDuration)
+
+      if (NodeStartTime && !hasSeekedToStart) {
+        const startTimeInSeconds = videoTimeToSeconds(NodeStartTime)
+
+        playerRef.current.seekTo(startTimeInSeconds, 'seconds')
+        setPlayingTime(startTimeInSeconds)
+        setHasSeekedToStart(true)
+      }
     }
   }
 
@@ -102,7 +156,7 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
         })
       } else {
         document.exitFullscreen()
-        setIsFullScreen(false)
+        setTimeout(() => setIsFullScreen(false), 300)
       }
     }
   }
@@ -122,7 +176,7 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
         const windowHeight = window.screen.height
         const mousePositionY = event.clientY
         const distanceFromBottom = windowHeight - mousePositionY
-        const threshold = 50 // Adjust this value as needed
+        const threshold = 50
 
         setIsMouseNearBottom(distanceFromBottom <= threshold)
       }
@@ -140,6 +194,9 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
       if (isFullScreen && event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
+      } else if (isFocused && event.key === ' ') {
+        event.preventDefault()
+        togglePlay()
       }
     }
 
@@ -152,27 +209,39 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
     }
   })
 
-  return playingNode?.link ? (
-    <Wrapper ref={wrapperRef} hidden={hidden}>
-      <Cover>
+  const handlePlayerClick = () => {
+    togglePlay()
+  }
+
+  return mediaUrl ? (
+    <Wrapper
+      ref={wrapperRef}
+      hidden={hidden}
+      onBlur={() => setIsFocused(false)}
+      onFocus={() => setIsFocused(true)}
+      tabIndex={0}
+    >
+      <Cover isFullScreen={isFullScreen}>
         <Avatar size={120} src={playingNode?.image_url || ''} type="clip" />
       </Cover>
-      <ReactPlayer
-        ref={playerRef}
-        controls={false}
-        height={!isFullScreen ? '200px' : window.screen.height}
-        onBuffer={() => setStatus('buffering')}
-        onBufferEnd={() => setStatus('ready')}
-        onError={handleError}
-        onPause={handlePause}
-        onPlay={handlePlay}
-        onProgress={handleProgress}
-        onReady={handleReady}
-        playing={isPlaying}
-        url={playingNode?.link || ''}
-        volume={volume}
-        width="100%"
-      />
+      <PlayerWrapper isFullScreen={isFullScreen} onClick={handlePlayerClick}>
+        <ReactPlayer
+          ref={playerRef}
+          controls={false}
+          height={!isFullScreen ? '200px' : window.screen.height}
+          onBuffer={() => setStatus('buffering')}
+          onBufferEnd={() => setStatus('ready')}
+          onError={handleError}
+          onPause={handlePause}
+          onPlay={handlePlay}
+          onProgress={handleProgress}
+          onReady={handleReady}
+          playing={isPlaying}
+          url={mediaUrl || ''}
+          volume={volume}
+          width="100%"
+        />
+      </PlayerWrapper>
       {status === 'error' ? (
         <ErrorWrapper className="error-wrapper">Error happened, please try later</ErrorWrapper>
       ) : null}
@@ -189,8 +258,8 @@ const MediaPlayerComponent: FC<Props> = ({ hidden }) => {
           showToolbar={isMouseNearBottom && isFullScreen}
         />
       ) : null}
-      {status === 'buffering' ? (
-        <Buffering>
+      {status === 'buffering' && !isYouTubeVideo ? (
+        <Buffering isFullScreen={isFullScreen}>
           <ClipLoader color={colors.lightGray} />
         </Buffering>
       ) : null}
@@ -206,19 +275,22 @@ const Wrapper = styled(Flex)<Props>`
   border-top-left-radius: 16px;
   overflow: hidden;
   height: ${(props) => (props.hidden ? '0px' : 'auto')};
+  &:focus {
+    outline: none;
+  }
 `
 
-const Cover = styled(Flex)`
+const Cover = styled(Flex)<FullScreenProps>`
   position: absolute;
-  top: 20%;
+  top: ${(props) => (props.isFullScreen ? '38%' : '18%')};
   left: 50%;
   transform: translateX(-50%);
   z-index: -1;
 `
 
-const Buffering = styled(Flex)`
+const Buffering = styled(Flex)<FullScreenProps>`
   position: absolute;
-  top: 39%;
+  top: ${(props) => (props.isFullScreen ? '43%' : '39%')};
   left: 50%;
   transform: translateX(-50%);
   z-index: 1;
@@ -228,6 +300,12 @@ const ErrorWrapper = styled(Flex)`
   height: 60px;
   padding: 12px 16px;
   color: ${colors.primaryRed};
+`
+
+const PlayerWrapper = styled.div<{ isFullScreen: boolean }>`
+  margin: ${(props) => (props.isFullScreen ? '80px auto' : '0')};
+  width: 100%;
+  cursor: pointer;
 `
 
 export const MediaPlayer = memo(MediaPlayerComponent)

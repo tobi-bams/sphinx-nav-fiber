@@ -20,15 +20,24 @@ type TTableRaw = {
   onSearch: (search: string) => void
   checkedStates: { [refId: string]: boolean }
   setCheckedStates: React.Dispatch<React.SetStateAction<{ [refId: string]: boolean }>>
+  isMuteDisabled?: boolean
 }
 
 interface CheckboxIconProps {
   checked?: boolean
 }
 
-const TableRowComponent: FC<TTableRaw> = ({ topic, onClick, onSearch, checkedStates, setCheckedStates }) => {
+const TableRowComponent: FC<TTableRaw> = ({
+  topic,
+  onClick,
+  onSearch,
+  checkedStates,
+  setCheckedStates,
+  isMuteDisabled,
+}) => {
   const [ids, total] = useTopicsStore((s) => [s.ids, s.total])
   const [loading, setLoading] = useState(false)
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
 
   const date = formatDate(topic.date_added_to_graph)
 
@@ -36,7 +45,7 @@ const TableRowComponent: FC<TTableRaw> = ({ topic, onClick, onSearch, checkedSta
     setLoading(true)
 
     try {
-      await putNodeData(refId, { muted_topic: shouldMute })
+      await putNodeData(refId, { node_type: topic?.node_type, node_data: { is_muted: shouldMute } })
 
       useTopicsStore.setState({
         ids: ids.filter((i) => i !== refId),
@@ -69,13 +78,14 @@ const TableRowComponent: FC<TTableRaw> = ({ topic, onClick, onSearch, checkedSta
 
   const handlePopoverOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget)
+    setIsPopoverOpen(true)
   }
 
   const handlePopoverClose = () => {
-    setAnchorEl(null)
+    setIsPopoverOpen(false)
   }
 
-  const open = Boolean(anchorEl)
+  const open = Boolean(anchorEl) && isPopoverOpen
 
   const checkboxVisibleClass = checkedStates[topic.ref_id] ? 'visible' : ''
 
@@ -84,6 +94,7 @@ const TableRowComponent: FC<TTableRaw> = ({ topic, onClick, onSearch, checkedSta
       <StyledTableCell>
         <CheckboxSection
           className={`checkbox-section ${checkboxVisibleClass}`}
+          data-testid="topic-check-box"
           onClick={() => handleSelect(topic.ref_id)}
         >
           <CheckboxIcon checked={checkedStates[topic.ref_id]}>
@@ -95,7 +106,9 @@ const TableRowComponent: FC<TTableRaw> = ({ topic, onClick, onSearch, checkedSta
         <ClickableText>{topic.name}</ClickableText>
       </StyledTableCell>
       <StyledTableCell>{topic.node_type}</StyledTableCell>
-      <StyledTableCell>{topic.edgeCount}</StyledTableCell>
+      <StyledTableCell>
+        <CountEdgeWrapper>{topic.edgeCount}</CountEdgeWrapper>
+      </StyledTableCell>
       <StyledTableCell>
         <Popover
           anchorEl={anchorEl}
@@ -106,13 +119,17 @@ const TableRowComponent: FC<TTableRaw> = ({ topic, onClick, onSearch, checkedSta
           disableRestoreFocus
           id="mouse-over-popover"
           onClose={handlePopoverClose}
+          onMouseEnter={() => setIsPopoverOpen(true)}
+          onMouseLeave={handlePopoverClose}
           open={open}
           sx={{
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
             '& .MuiPaper-root': {
               backgroundColor: 'rgba(0, 0, 0, 0.9)',
               borderRadius: '4px',
               width: '160px',
+              maxHeight: '200px',
+              overflowY: 'scroll',
             },
           }}
           transformOrigin={{
@@ -132,7 +149,7 @@ const TableRowComponent: FC<TTableRaw> = ({ topic, onClick, onSearch, checkedSta
             component="span"
             onMouseEnter={handlePopoverOpen}
             onMouseLeave={handlePopoverClose}
-            sx={{ cursor: 'context-menu' }}
+            sx={{ cursor: 'pointer' }}
           >
             ,...
           </Typography>
@@ -151,16 +168,24 @@ const TableRowComponent: FC<TTableRaw> = ({ topic, onClick, onSearch, checkedSta
               </ClipLoaderWrapper>
             ) : (
               <Flex direction="row">
-                {topic.muted_topic ? (
-                  <IconButton className="centered" onClick={() => handleMute(topic.ref_id, false)}>
+                {topic.is_muted ? (
+                  <IconButton
+                    className="centered"
+                    disabled={isMuteDisabled}
+                    onClick={() => handleMute(topic.ref_id, false)}
+                  >
                     <ProfileShow />
                   </IconButton>
                 ) : (
-                  <IconButton className="centered" onClick={() => handleMute(topic.ref_id, true)}>
+                  <IconButton
+                    className="centered"
+                    disabled={isMuteDisabled}
+                    onClick={() => handleMute(topic.ref_id, true)}
+                  >
                     <ProfileHide />
                   </IconButton>
                 )}
-                <IconButton onClick={(e) => onClick(e, topic.ref_id)}>
+                <IconButton disabled={isMuteDisabled} onClick={(e) => onClick(e, topic.ref_id)}>
                   <ThreeDotsIcons data-testid="ThreeDotsIcons" />
                 </IconButton>
               </Flex>
@@ -212,6 +237,12 @@ const Checkmark = styled.div`
   justify-content: center;
   border-radius: 2px;
   background-color: transparent;
+`
+
+const CountEdgeWrapper = styled.span`
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `
 
 export const TopicRow = memo(TableRowComponent)

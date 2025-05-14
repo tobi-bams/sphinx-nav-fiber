@@ -19,7 +19,7 @@ export async function getSignedMessageFromRelay(): Promise<{ message: string; si
   }
 
   try {
-    message = `${window.crypto.randomUUID()}${new Date().getTime()}`
+    message = btoa(`${window.crypto.randomUUID()}${new Date().getTime()}`)
   } catch (error) {
     return { message: '', signature: '' }
   }
@@ -35,7 +35,11 @@ export async function getSignedMessageFromRelay(): Promise<{ message: string; si
           .then((storedLsat: any) => {
             signingPromise = null // Reset the promise after it's resolved
 
-            const response = { message, signature: storedLsat.signature }
+            if (!storedLsat) {
+              return { message: '', signature: '' }
+            }
+
+            const response = { message, signature: storedLsat?.signature || '' }
 
             storeSignatureInLocalStorage({ ...response })
 
@@ -79,10 +83,4 @@ export async function getSignedMessageFromRelay(): Promise<{ message: string; si
 
 function storeSignatureInLocalStorage(sig: { message: string; signature: string }) {
   localStorage.setItem('signature', JSON.stringify({ ...sig }))
-}
-
-export async function generateAuthQueryParam() {
-  const res = await getSignedMessageFromRelay()
-
-  return `sig=${res.signature}&msg=${res.message}`
 }

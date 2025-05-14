@@ -1,11 +1,12 @@
-import React from 'react'
 import { useFormContext } from 'react-hook-form'
+import { useNavigate } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 import { colors } from '~/utils/colors'
 
 type Props = {
   loading?: boolean
   onSubmit?: () => void
+  placeholder?: string
 }
 
 const Input = styled.input.attrs(() => ({
@@ -13,8 +14,8 @@ const Input = styled.input.attrs(() => ({
   autoComplete: 'off',
 }))<{ loading?: boolean }>`
   pointer-events: auto;
-  height: 48px;
-  padding: 0 20px;
+  height: 40px;
+  padding: 0 40px 0 18px;
   z-index: 2;
   box-shadow: 0px 1px 6px rgba(0, 0, 0, 0.1);
   width: 100%;
@@ -23,6 +24,17 @@ const Input = styled.input.attrs(() => ({
   border: none;
   border-radius: 200px;
   background: ${colors.BG2};
+
+  -webkit-autofill,
+  -webkit-autocomplete,
+  -webkit-contacts-auto-fill,
+  -webkit-credentials-auto-fill {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    right: 0 !important;
+  }
 
   &:focus {
     outline: 1px solid ${colors.primaryBlue};
@@ -47,21 +59,36 @@ const Input = styled.input.attrs(() => ({
     `}
 `
 
-export const SearchBar = ({ loading, onSubmit }: Props) => {
-  const { register } = useFormContext()
+export const SearchBar = ({ loading, placeholder = 'Search', onSubmit }: Props) => {
+  const { register, watch } = useFormContext()
+
+  const typing = watch('search')
+  const navigate = useNavigate()
 
   return (
     <Input
       {...register('search')}
+      data-testid="search_input"
       disabled={loading}
       id="main-search"
-      loading={loading}
       onKeyPress={(event) => {
         if (event.key === 'Enter') {
-          onSubmit?.()
+          if (typing.trim() === '') {
+            return
+          }
+
+          if (onSubmit) {
+            onSubmit()
+
+            return
+          }
+
+          const encodedQuery = typing.replace(/\s+/g, '+')
+
+          navigate(`/search?q=${encodedQuery}`)
         }
       }}
-      placeholder="Search"
+      placeholder={placeholder}
       type="text"
     />
   )

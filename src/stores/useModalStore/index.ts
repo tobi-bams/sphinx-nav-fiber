@@ -11,11 +11,20 @@ export type AvailableModals =
   | 'addSource'
   | 'settings'
   | 'mergeTopic'
+  | 'mergeToNode'
   | 'briefDescription'
   | 'editNodeName'
   | 'removeNode'
   | 'removeNodeType'
   | 'addEdgeToNode'
+  | 'blueprintGraph'
+  | 'changeNodeType'
+  | 'feedback'
+  | 'createBounty'
+  | 'onboardingFlow'
+  | 'nodeAction'
+  | 'tweetAnalyze'
+  | 'claim'
 
 type ModalStore = {
   currentModals: Record<AvailableModals, boolean>
@@ -39,8 +48,17 @@ const defaultData = {
     briefDescription: false,
     editNodeName: false,
     removeNode: false,
+    mergeToNode: false,
     removeNodeType: false,
     addEdgeToNode: false,
+    blueprintGraph: false,
+    changeNodeType: false,
+    feedback: false,
+    createBounty: false,
+    onboardingFlow: false,
+    nodeAction: false,
+    tweetAnalyze: false,
+    claim: false,
   },
 }
 

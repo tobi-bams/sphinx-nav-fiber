@@ -4,7 +4,7 @@ import { ClipLoader } from 'react-spinners'
 import styled from 'styled-components'
 import ClearIcon from '~/components/Icons/ClearIcon'
 import SearchIcon from '~/components/Icons/SearchIcon'
-import Search from '~/components/SourcesTableModal/SourcesView/Topics/Search'
+import Search from '~/components/SourcesTableModal/SourcesView/common/search'
 import { Flex } from '~/components/common/Flex'
 import { Text } from '~/components/common/Text'
 import { putNodeData } from '~/network/fetchSourcesData'
@@ -19,9 +19,7 @@ import { MergeTopicModal } from './MergeTopicModal'
 import { Table } from './Table'
 
 export const TopicSources = () => {
-  const [loading, setLoading] = useState(false)
-
-  const [data, ids, total, setTopics, filters, setFilters, terminate] = useTopicsStore((s) => [
+  const [data, ids, total, setTopics, filters, setFilters, terminate, loading] = useTopicsStore((s) => [
     s.data,
     s.ids,
     s.total,
@@ -29,12 +27,14 @@ export const TopicSources = () => {
     s.filters,
     s.setFilters,
     s.terminate,
+    s.loading,
   ])
 
   const { open: openEditTopic } = useModal('editTopic')
   const { open: openMergeTopic } = useModal('mergeTopic')
   const { open: openAddEdge } = useModal('addEdge')
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
+  const [multiSelectedTopics, setMultiSelectedTopics] = useState<Topic[]>([])
   const [checkedStates, setCheckedStates] = useState<{ [refId: string]: boolean }>({})
 
   const topicActions: Record<string, () => void> = {
@@ -54,12 +54,9 @@ export const TopicSources = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        setLoading(true)
         await setTopics()
       } catch {
         console.error('err')
-      } finally {
-        setLoading(false)
       }
     }
 
@@ -67,14 +64,7 @@ export const TopicSources = () => {
   }, [setTopics, filters])
 
   const handleLoadMore = async () => {
-    try {
-      setLoading(true)
-      setFilters({ page: filters.page + 1 })
-    } catch (error) {
-      console.error('Error loading more data:', error)
-    } finally {
-      setLoading(false)
-    }
+    setFilters({ page: filters.page + 1 })
   }
 
   useEffect(
@@ -90,11 +80,12 @@ export const TopicSources = () => {
 
   const modalCloseHandler = () => {
     setSelectedTopic(null)
+    setMultiSelectedTopics([])
   }
 
   const handleMute = async (refId: string, action: string) => {
     try {
-      await putNodeData(refId, { muted_topic: action === 'mute' })
+      await putNodeData(refId, { node_data: { is_muted: action === 'mute' } })
       useTopicsStore.setState({ ids: ids.filter((i) => i !== refId), total: total - 1 })
     } catch (error) {
       console.warn(error)
@@ -106,15 +97,34 @@ export const TopicSources = () => {
       return
     }
 
-    setSelectedTopic(data[topicId])
+    if (action === 'mergeTopic') {
+      if (Object.values(checkedStates).filter((isChecked) => isChecked).length > 0) {
+        const selectedTopics = Object.entries(checkedStates)
+          .filter(([, isChecked]) => isChecked)
+          .map(([id]) => data[id])
 
-    if (['mute', 'unMute'].includes(action)) {
-      await handleMute(topicId, action)
-    }
+        setMultiSelectedTopics(selectedTopics)
+        openMergeTopic()
+      } else {
+        setMultiSelectedTopics([data[topicId]])
+        setSelectedTopic(data[topicId])
+        openMergeTopic()
+      }
+    } else {
+      if (['mute', 'unMute'].includes(action)) {
+        await handleMute(topicId, action)
+      }
 
-    if (typeof topicActions[action] === 'function') {
-      topicActions[action]()
+      if (typeof topicActions[action] === 'function') {
+        topicActions[action]()
+      }
+
+      setSelectedTopic(data[topicId])
     }
+  }
+
+  const handleSearch = (query: string) => {
+    setFilters({ ...filters, search: query })
   }
 
   return (
@@ -124,40 +134,39 @@ export const TopicSources = () => {
           <Text className="title">Topics</Text>
         </Heading>
 
-        <InputWrapper>
+        <InputWrapper data-testid="topic-search-container">
           <Search
             activeIcon={<ClearIcon />}
             defaultIcon={<SearchIcon />}
-            loadingIcon={<ClipLoader color={colors.PRIMARY_BLUE} size={24} />}
+            loading={loading}
+            loadingIcon={<ClipLoader color={colors.lightGray} size={24} />}
+            onSearch={handleSearch}
             placeholder="Search ..."
           />
         </InputWrapper>
 
         <TableWrapper align="center" justify={loading && !data ? 'center' : 'flex-start'}>
-          {loading && !data ? (
-            <ClipLoader color={colors.white} />
-          ) : (
-            <>
-              <Table
-                checkedStates={checkedStates}
-                onChangeFilter={handleFilterChange}
-                onTopicEdit={onTopicEdit}
-                setCheckedStates={setCheckedStates}
-                setShowMuteUnmute={() => setFilters({ muted: !filters.muted })}
-                showMuted={filters.muted}
-              />
-              {total > ids.length ? (
-                <Button className="load-more" disabled={loading} onClick={handleLoadMore}>
-                  Load more
-                  {loading && <ClipLoader color={colors.BLUE_PRESS_STATE} size={10} />}
-                </Button>
-              ) : null}
-            </>
-          )}
+          <Table
+            checkedStates={checkedStates}
+            loading={loading}
+            onChangeFilter={handleFilterChange}
+            onTopicEdit={onTopicEdit}
+            setCheckedStates={setCheckedStates}
+            setShowMuteUnmute={() => setFilters({ is_muted: !filters.is_muted })}
+            showMuted={filters.is_muted}
+          />
+          {total > ids.length ? (
+            <Button className="load-more" disabled={loading} onClick={handleLoadMore}>
+              Load more
+              {loading && <ClipLoader color={colors.lightGray} size={10} />}
+            </Button>
+          ) : null}
         </TableWrapper>
       </Wrapper>
 
-      {selectedTopic && <MergeTopicModal onClose={modalCloseHandler} topic={selectedTopic} />}
+      {multiSelectedTopics.length > 0 && (
+        <MergeTopicModal multiTopics={multiSelectedTopics} onClose={modalCloseHandler} />
+      )}
       {selectedTopic && <EditTopicModal onClose={modalCloseHandler} topic={selectedTopic} />}
       {selectedTopic && <AddEdgeModal onClose={modalCloseHandler} topic={selectedTopic} />}
     </>

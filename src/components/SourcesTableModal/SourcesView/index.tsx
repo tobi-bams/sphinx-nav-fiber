@@ -2,16 +2,16 @@ import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
 import * as React from 'react'
 import styled from 'styled-components'
+import { Content } from '~/components/SourcesTableModal/SourcesView/Content'
 import { Flex } from '~/components/common/Flex'
 import { useFeatureFlagStore } from '~/stores/useFeatureFlagStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { colors } from '~/utils/colors'
+import { isSphinx } from '~/utils/isSphinx'
 import { QueuedSources } from './QueuedSources'
 import { Sources } from './Sources'
 import { TopicSources } from './Topics'
 import { QUEUED_SOURCES, SOURCE_TABLE, TOPICS, VIEW_CONTENT } from './constants'
-import { Content } from '~/components/SourcesTableModal/SourcesView/Content'
-import { isSphinx } from '~/utils/isSphinx'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -52,7 +52,7 @@ function a11yProps(index: number) {
 export const SourcesView = () => {
   const [value, setValue] = React.useState(0)
   const [isAdmin] = useUserStore((s) => [s.isAdmin])
-  const [queuedSourcesFlag] = useFeatureFlagStore((s) => [s.queuedSourcesFlag])
+  const [queuedSourcesFeatureFlag] = useFeatureFlagStore((s) => [s.queuedSourcesFeatureFlag])
   const sphinxEnabled = isSphinx()
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -65,7 +65,7 @@ export const SourcesView = () => {
     }
 
     if (label === QUEUED_SOURCES) {
-      return isAdmin && queuedSourcesFlag
+      return isAdmin && queuedSourcesFeatureFlag
     }
 
     if (label === VIEW_CONTENT) {
@@ -76,7 +76,7 @@ export const SourcesView = () => {
   })
 
   return (
-    <Wrapper direction="column">
+    <Wrapper data-testid="sources-table" direction="column">
       <StyledTabs aria-label="sources tabs" onChange={handleChange} value={value}>
         {tabs.map((tab, index) => (
           <StyledTab key={tab.label} color={colors.white} disableRipple label={tab.label} {...a11yProps(index)} />
@@ -124,9 +124,33 @@ const TabPanelWrapper = styled(Flex)`
   min-height: 572px;
   padding: 20px 0;
   max-height: 572px;
+  overflow: auto;
+
+  @media (max-width: 1024px) {
+    width: 100%;
+    min-height: 400px;
+    max-height: 400px;
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+    min-height: 300px;
+    max-height: 300px;
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
+    min-height: 250px;
+    max-height: 250px;
+  }
 `
 
 const Wrapper = styled(Flex)`
   min-height: 0;
   flex: 1;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    padding: 3px;
+  }
 `

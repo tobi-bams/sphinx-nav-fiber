@@ -5,10 +5,11 @@ import { ClipLoader } from 'react-spinners'
 import styled from 'styled-components'
 import { validateImageInputType } from '~/components/ModalsContainer/EditNodeNameModal/utils'
 import { Flex } from '~/components/common/Flex'
-import { getTopicsData, putNodeData } from '~/network/fetchSourcesData'
-import { useSelectedNode } from '~/stores/useDataStore'
+import { editNodeData, getTopicsData } from '~/network/fetchSourcesData'
+import { useDataStore } from '~/stores/useDataStore'
+import { useSelectedNode } from '~/stores/useGraphStore'
 import { useModal } from '~/stores/useModalStore'
-import { Topic } from '~/types'
+import { NodeEditRequest, NodeExtended, Topic } from '~/types'
 import { colors } from '~/utils/colors'
 import { TitleEditor } from '../Title'
 
@@ -16,6 +17,7 @@ export type FormData = {
   name: string
   image_url: string
   imageInputType?: boolean
+  [key: string]: unknown
 }
 
 export const Body = () => {
@@ -23,22 +25,21 @@ export const Body = () => {
   const form = useForm<FormData>({ mode: 'onChange' })
   const { watch, setValue, reset, getValues } = form
   const [loading, setLoading] = useState(false)
-
   const [topicIsLoading, setTopicIsLoading] = useState(false)
-
   const [actualTopicNode, setActualTopicNode] = useState<null | Topic>()
-
   const selectedNode = useSelectedNode()
-
+  const updateNode = useDataStore((s) => s.updateNode)
   const { open: openRemoveNodeModal } = useModal('removeNode')
 
   useEffect(() => {
     if (actualTopicNode) {
-      setValue('name', actualTopicNode?.name)
+      Object.keys(actualTopicNode).forEach((key) => {
+        setValue(key, actualTopicNode[key as keyof Topic])
+      })
     } else if (selectedNode) {
-      setValue('name', selectedNode.name)
-
-      setValue('image_url', selectedNode?.image_url ?? '')
+      Object.keys(selectedNode).forEach((key) => {
+        setValue(key, selectedNode[key as keyof NodeExtended])
+      })
     }
 
     return () => {
@@ -61,7 +62,7 @@ export const Body = () => {
 
         setActualTopicNode(node)
       } catch (error) {
-        console.log(error)
+        console.error(error)
       } finally {
         setTopicIsLoading(false)
       }
@@ -71,9 +72,6 @@ export const Body = () => {
   }, [selectedNode])
 
   const isValidImageUrl = watch('imageInputType')
-
-  const topicValue = watch('name')
-
   const imageUrl = watch('image_url')
 
   useEffect(() => {
@@ -87,12 +85,33 @@ export const Body = () => {
   const node = actualTopicNode || selectedNode
 
   const handleSave = async () => {
+    if (!node) {
+      return
+    }
+
     setLoading(true)
 
-    const propName = 'name'
+    const formData: FormData = getValues()
+
+    const nodeData = {
+      name: formData.name,
+      image_url: formData.image_url,
+      properties: formData.properties,
+    }
 
     try {
-      await putNodeData(node?.ref_id || '', { [propName]: topicValue.trim(), image_url: imageUrl.trim() })
+      const payloadData: NodeEditRequest = {
+        node_type: node.node_type,
+        ref_id: node.ref_id,
+        properties: nodeData.properties as { [key: string]: unknown },
+      }
+
+      await editNodeData(node?.ref_id || '', payloadData)
+
+      updateNode({
+        ...node,
+        ...nodeData,
+      } as NodeExtended)
 
       closeHandler()
     } catch (error) {
@@ -106,7 +125,13 @@ export const Body = () => {
     openRemoveNodeModal()
   }
 
-  const isNodeNameChanged = getValues().name && actualTopicNode?.name !== getValues().name
+  const name = getValues()?.name?.trim()
+
+  const isNodeNameChanged = name && actualTopicNode?.name.trim() !== name
+  const isImageUrlChanged = getValues().image_url && selectedNode?.image_url !== getValues()?.image_url
+
+  const shouldDisableSave =
+    loading || topicIsLoading || (!!imageUrl && !isValidImageUrl) || (!isNodeNameChanged && !isImageUrlChanged)
 
   return (
     <Wrapper>
@@ -116,30 +141,36 @@ export const Body = () => {
             <Skeleton />
           </Flex>
         ) : (
-          <TitleEditor isValidImageUrl={isValidImageUrl} />
+          <TitleEditor />
         )}
-        <Flex direction="row" mb={6}>
-          <DeleteButton
+
+        <Flex direction="row" justify="space-between" mt={20}>
+          <Flex direction="column">
+            <DeleteButton
+              color="secondary"
+              disabled={topicIsLoading || !node}
+              onClick={handleDelete}
+              size="large"
+              variant="contained"
+            >
+              Delete
+            </DeleteButton>
+          </Flex>
+
+          <CustomButton
             color="secondary"
-            disabled={topicIsLoading || !node}
-            onClick={handleDelete}
-            size="large"
-            style={{ marginRight: 20 }}
-            variant="contained"
-          >
-            Delete
-          </DeleteButton>
-          <Button
-            color="secondary"
-            disabled={loading || topicIsLoading || !isNodeNameChanged || !isValidImageUrl}
+            disabled={shouldDisableSave}
             onClick={handleSave}
             size="large"
-            style={{ flex: 1 }}
             variant="contained"
           >
             Save Changes
-            {loading && <ClipLoader color={colors.BLUE_PRESS_STATE} size={10} />}
-          </Button>
+            {loading && (
+              <ClipLoaderWrapper>
+                <ClipLoader color={colors.lightGray} size={12} />
+              </ClipLoaderWrapper>
+            )}
+          </CustomButton>
         </Flex>
       </FormProvider>
     </Wrapper>
@@ -154,6 +185,8 @@ const DeleteButton = styled(Button)`
   && {
     color: ${colors.primaryRed};
     background-color: rgba(237, 116, 116, 0.1);
+    flex: 1;
+    margin-right: 10px;
 
     &:hover,
     &:active,
@@ -162,4 +195,13 @@ const DeleteButton = styled(Button)`
       background-color: rgba(237, 116, 116, 0.2);
     }
   }
+`
+
+const ClipLoaderWrapper = styled.span`
+  margin-top: 4px;
+`
+
+const CustomButton = styled(Button)`
+  width: 80% !important;
+  margin: 0 auto !important;
 `

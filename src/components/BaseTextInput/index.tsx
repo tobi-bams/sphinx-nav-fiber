@@ -1,17 +1,17 @@
 import { ChangeEvent, forwardRef, useCallback } from 'react'
 import { defaultProps } from './defaultProps'
-import { autoCompleteValuesWeb } from './tokens/autoComplete'
+
 import { BaseTextInputProps, ForwardedRef } from './types'
 import { WebTextInput } from './WebTextInput'
 
 export const BaseTextInput = forwardRef(
   (
     {
-      autoCapitalize,
       autoComplete = defaultProps.autoComplete,
       autoFocus,
       className,
       colorName = defaultProps.colorName,
+      dataTestId,
       defaultValue,
       disabled = defaultProps.disabled,
       id,
@@ -41,11 +41,11 @@ export const BaseTextInput = forwardRef(
     return (
       <WebTextInput
         ref={ref}
-        autoCapitalize={autoCapitalize}
-        autoComplete={autoCompleteValuesWeb[autoComplete]}
+        autoComplete={autoComplete}
         autoFocus={autoFocus}
         className={className}
         colorName={colorName}
+        data-testid={dataTestId}
         defaultValue={defaultValue}
         disabled={disabled}
         id={id}
@@ -57,6 +57,7 @@ export const BaseTextInput = forwardRef(
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         placeholderTextColor={placeholderTextColor}
+        spellCheck={false}
         textAlign={textAlign}
         type={type}
         value={value}

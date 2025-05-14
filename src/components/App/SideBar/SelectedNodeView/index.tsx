@@ -1,7 +1,6 @@
 import { memo, useEffect } from 'react'
-import { useDataStore, useSelectedNode } from '~/stores/useDataStore'
+import { useSelectedNode } from '~/stores/useGraphStore'
 import { usePlayerStore } from '~/stores/usePlayerStore'
-import { TeachMeText } from '../../Helper/TeachMe'
 import { Data } from '../Data'
 import { Episode } from '../Episode'
 import { Image } from '../Image'
@@ -14,24 +13,24 @@ import { TwitData } from '../TwitData'
 import { Default } from './Default'
 import { Document } from './Document'
 
-const MEDIA_TYPES = ['clip', 'twitter_space', 'youtube', 'episode', 'podcast']
-
 // eslint-disable-next-line no-underscore-dangle
 const _View = () => {
   const selectedNode = useSelectedNode()
-  const { showTeachMe } = useDataStore((s) => s)
 
   const { setPlayingNode } = usePlayerStore((s) => s)
 
   useEffect(() => {
-    if (MEDIA_TYPES.includes(selectedNode?.node_type || '')) {
+    if (!selectedNode) {
+      return
+    }
+
+    const media =
+      selectedNode.media_url || selectedNode.link || selectedNode.properties?.link || selectedNode.properties?.media_url
+
+    if (media) {
       setPlayingNode(selectedNode)
     }
   }, [setPlayingNode, selectedNode])
-
-  if (showTeachMe) {
-    return <TeachMeText />
-  }
 
   switch (selectedNode?.node_type) {
     case 'guest':
@@ -41,13 +40,13 @@ const _View = () => {
       return <Data />
     case 'tribe_message':
       return <Messages />
-    case 'tweet':
+    case 'Tweet':
       return <TwitData />
     case 'topic':
       return <Topic />
     case 'show':
       return <Show />
-    case 'youtube':
+    case 'video':
     case 'podcast':
     case 'clip':
     case 'twitter_space':

@@ -1,13 +1,11 @@
 import { Button } from '@mui/material'
 import styled from 'styled-components'
 import CameraCenterIcon from '~/components/Icons/CameraCenterIcon'
-import { useDataStore } from '~/stores/useDataStore'
+import { useGraphStore } from '~/stores/useGraphStore'
 
 export const CameraRecenterControl = () => {
-  const [cameraFocusTrigger, setCameraFocusTrigger] = useDataStore((s) => [
-    s.cameraFocusTrigger,
-    s.setCameraFocusTrigger,
-  ])
+  const cameraFocusTrigger = useGraphStore((s) => s.cameraFocusTrigger)
+  const setCameraFocusTrigger = useGraphStore((s) => s.setCameraFocusTrigger)
 
   return (
     <CameraCenterButton

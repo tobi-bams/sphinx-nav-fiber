@@ -25,6 +25,10 @@ export const OptionTypes: TOption[] = [
     label: 'string',
     value: 'string',
   },
+  {
+    label: 'boolean',
+    value: 'boolean',
+  },
 ]
 
 export const OPTIONS: TOption[] = [
@@ -65,3 +69,5 @@ export const OPTIONS: TOption[] = [
     value: 'Topic',
   },
 ]
+
+export const noSpacePattern = /^[^\s].*$/

@@ -7,12 +7,10 @@ import styled from 'styled-components'
 import { Flex } from '~/components/common/Flex'
 import { Text } from '~/components/common/Text'
 import { useAppStore } from '~/stores/useAppStore'
-import { useFeatureFlagStore } from '~/stores/useFeatureFlagStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { colors } from '~/utils/colors'
 import { Appearance } from './Appearance'
 import { General } from './General'
-import { GraphBlueprint } from './GraphBlueprint'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -50,7 +48,6 @@ type Props = {
 export const SettingsView: React.FC<Props> = ({ onClose }) => {
   const [value, setValue] = useState(0)
   const [isAdmin] = useUserStore((s) => [s.isAdmin, s.setPubKey])
-  const customSchemaFlag = useFeatureFlagStore((s) => s.customSchemaFlag)
   const appMetaData = useAppStore((s) => s.appMetaData)
 
   const getSettingsLabel = () => (isAdmin ? 'Admin Settings' : 'Settings')
@@ -71,11 +68,10 @@ export const SettingsView: React.FC<Props> = ({ onClose }) => {
   const tabs = [
     ...(isAdmin ? [{ label: 'General', component: General }] : []),
     { label: 'Appearance', component: Appearance },
-    ...(isAdmin && customSchemaFlag ? [{ label: 'Blueprint', component: GraphBlueprint }] : []),
   ]
 
   return (
-    <Wrapper direction="column">
+    <Wrapper data-testid="settings-modal" direction="column">
       <SettingsHeader>
         <StyledTabs aria-label="settings tabs" onChange={handleChange} value={value}>
           {tabs.map((tab, index) => (
@@ -85,7 +81,7 @@ export const SettingsView: React.FC<Props> = ({ onClose }) => {
       </SettingsHeader>
       {tabs.map((tab, index) => (
         <TabPanel key={tab.label} index={index} value={value}>
-          <tab.component initialValues={appMetaData} onClose={onClose} />
+          {appMetaData && <tab.component initialValues={appMetaData} onClose={onClose} />}
         </TabPanel>
       ))}
     </Wrapper>
@@ -135,11 +131,33 @@ const TabPanelWrapper = styled(Flex)`
   min-width: 480px;
   overflow: hidden;
   border-radius: 9px;
+
+  @media (max-width: 1024px) {
+    min-height: auto;
+    overflow: auto;
+    max-height: 400px;
+    min-width: 480px;
+  }
+
+  @media (max-width: 768px) {
+    min-height: auto;
+    overflow: auto;
+    max-height: 300px;
+    min-width: 380px;
+  }
+
+  @media (max-width: 480px) {
+    min-height: auto;
+    overflow: auto;
+    max-height: 200px;
+    min-width: 280px;
+  }
 `
 
 const Wrapper = styled(Flex)`
   min-height: 0;
   flex: 1;
+  overflow: hidden;
 `
 
 const StyledText = styled(Text)`
@@ -147,4 +165,12 @@ const StyledText = styled(Text)`
   font-weight: 600;
   font-family: Barlow;
   padding: 0 0 0 36px;
+
+  @media (max-width: 1024px) {
+    font-size: 20px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 18px;
+  }
 `

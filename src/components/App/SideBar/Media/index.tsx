@@ -1,12 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { Booster } from '~/components/Booster'
 import { Divider } from '~/components/common/Divider'
 import { Flex } from '~/components/common/Flex'
 import { useAppStore } from '~/stores/useAppStore'
-import { useDataStore } from '~/stores/useDataStore'
+import { useSelectedNode } from '~/stores/useGraphStore'
 import { NodeExtended } from '~/types'
-import { formatDescription } from '~/utils/formatDescription'
 import { BoostAmt } from '../../Helper/BoostAmt'
 import { Description } from '../Description'
 import { Episode } from '../Relevance/Episode'
@@ -17,43 +16,46 @@ type Props = {
 }
 
 export const Media = ({ node }: Props) => {
-  const selectedNode = useDataStore((s) => s.selectedNode)
+  const selectedNode = useSelectedNode()
 
   const searchTerm = useAppStore((s) => s.currentSearch)
 
   const {
-    link,
     image_url: imageUrl,
     date,
     boost,
     node_type: nodeType,
-    type,
     id,
     show_title: showTitle,
-    episode_title: episodeTitle,
     ref_id: refId,
   } = node || selectedNode || {}
 
   const [boostAmount, setBoostAmount] = useState<number>(boost || 0)
 
+  useEffect(() => {
+    setBoostAmount(boost ?? 0)
+  }, [boost])
+
   if (!node && !selectedNode) {
     return null
   }
 
+  const currentNode = node || selectedNode
+
   return (
     <div style={{ overflow: 'auto', flex: 1, width: '100%' }}>
       <Wrapper>
-        <StyledEpisode
-          boostCount={boostAmount || 0}
-          date={date || 0}
-          episodeTitle={formatDescription(episodeTitle)}
-          imageUrl={imageUrl}
-          isSelectedView
-          link={link}
-          onClick={() => null}
-          showTitle={showTitle}
-          type={nodeType || type}
-        />
+        {currentNode && nodeType ? (
+          <StyledEpisode
+            boostCount={boostAmount || 0}
+            date={date || 0}
+            imageUrl={imageUrl}
+            node={currentNode}
+            onClick={() => null}
+            showTitle={showTitle}
+            type={nodeType}
+          />
+        ) : null}
         <StyledDivider />
 
         <BoostWrapper>
@@ -64,10 +66,14 @@ export const Media = ({ node }: Props) => {
         <TextWrapper>
           <Description node={node || selectedNode} searchTerm={searchTerm} stateless />
         </TextWrapper>
-        <StyledDivider />
-        <TextWrapper>
-          <Transcript key={id} node={node || selectedNode} stateless />
-        </TextWrapper>
+        {(selectedNode?.text || node?.text) && (
+          <>
+            <StyledDivider />
+            <TextWrapper>
+              <Transcript key={id} node={node || selectedNode} stateless />
+            </TextWrapper>
+          </>
+        )}
       </Wrapper>
     </div>
   )

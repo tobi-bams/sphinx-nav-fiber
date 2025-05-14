@@ -1,4 +1,4 @@
-export const imageUrlRegex = /^https:\/\/.*\.(png|jpg|svg)$/
+export const imageUrlRegex = /^https:\/\/\S+\.(png|jpe?g|svg)$/
 
 export function validateImageInputType(url: string): boolean {
   if (imageUrlRegex.test(url)) {
@@ -6,4 +6,11 @@ export function validateImageInputType(url: string): boolean {
   }
 
   return false
+}
+
+export function formatLabel(label: string): string {
+  return label
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 }

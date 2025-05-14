@@ -6,6 +6,7 @@ import { FetchTopicResponse, Topic, TopicFilter } from '~/types'
 type TopicsStore = {
   data: Record<string, Topic> | null
   ids: string[]
+  loading: boolean
   total: number
   filters: TopicFilter
   setTopics: () => void
@@ -16,18 +17,32 @@ type TopicsStore = {
 const defaultData: Omit<TopicsStore, 'setTopics' | 'setFilters' | 'terminate'> = {
   data: null,
   ids: [],
+  loading: false,
   total: 0,
   filters: {
-    muted: false,
+    is_muted: false,
     sortBy: DATE,
     page: 0,
     pageSize: 50,
   },
 }
 
+let abortController: AbortController | null = null
+
 export const useTopicsStore = create<TopicsStore>((set, get) => ({
   ...defaultData,
   setTopics: async () => {
+    set({ loading: true })
+
+    if (abortController) {
+      abortController.abort()
+    }
+
+    const controller = new AbortController()
+    const { signal } = controller
+
+    abortController = controller
+
     const { data, ids, filters } = get()
 
     const payload = prepareTopicFilters(filters)
@@ -37,7 +52,7 @@ export const useTopicsStore = create<TopicsStore>((set, get) => ({
     }
 
     try {
-      const responseData: FetchTopicResponse = await getTopicsData(payload)
+      const responseData: FetchTopicResponse = await getTopicsData(payload, signal)
 
       // Instead of replacing the data, append new data to existing data
       const newData: Record<string, Topic> = filters.page === 0 ? {} : { ...(data || {}) }
@@ -49,8 +64,10 @@ export const useTopicsStore = create<TopicsStore>((set, get) => ({
       })
 
       set({ data: newData, ids: newIds, total: responseData.totalCount })
+
+      set({ loading: false })
     } catch (error) {
-      console.log(error)
+      console.error(error)
     }
   },
   setFilters: (filters: Partial<TopicFilter>) => set({ filters: { ...get().filters, page: 0, ...filters } }),
@@ -58,10 +75,9 @@ export const useTopicsStore = create<TopicsStore>((set, get) => ({
 }))
 
 const prepareTopicFilters = (filters: TopicFilter): TtopicsParams => ({
-  muted: filters.muted ? 'True' : 'False',
+  muted: filters.is_muted ? 'True' : 'False',
   skip: String(filters.page * filters.pageSize),
   limit: String(filters.pageSize),
   sort_by: filters.sortBy,
-  search: filters.search || '',
-  ...(!filters.search ? { node_type: 'Topic' } : {}),
+  ...(!filters.search ? { node_type: 'Topic' } : { search: filters.search }),
 })

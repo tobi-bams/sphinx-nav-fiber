@@ -1,234 +1,261 @@
 import { create } from 'zustand'
-import { devtools } from 'zustand/middleware'
-import { isChileGraph } from '~/constants'
-import { fetchGraphData } from '~/network/fetchGraphDataNew'
-import { EdgeExtendedNew, NodeExtendedNew, NormalizedEdges, NormalizedNodes } from '~/network/fetchGraphDataNew/types'
-import { saveSearchTerm } from '~/utils/relayHelper/index'
+import { GraphData, Link, NodeExtended } from '~/types'
+import { useDataStore } from '../useDataStore'
+import { useSimulationStore } from '../useSimulationStore'
 
-export type GraphStyle = 'sphere' | 'force' | 'split' | 'earth' | 'v2'
-
-type GraphData = {
-  nodes: NodeExtendedNew[]
-  links: EdgeExtendedNew[]
+export type Position = {
+  x: number
+  y: number
+  z: number
 }
 
-export const graphStyles: GraphStyle[] = ['sphere', 'force', 'split', 'earth', 'v2']
-
-export type FetchNodeParams = {
-  word?: string
-  skip_cache?: string
-  free?: string
-  media_type?: string
+export type Neighbourhood = {
+  name: string
+  ref_id: string
 }
+
+export type GraphStyle = 'sphere' | 'force' | 'split' | 'earth'
+
+export const graphStyles: GraphStyle[] = ['sphere', 'force', 'split', 'earth']
 
 export type GraphStore = {
-  disableCameraRotation: boolean
-  graphRadius: number | null
-  data: { nodes: NodeExtendedNew[]; links: EdgeExtendedNew[] } | null
+  graphRadius: number
+  neighbourhoods: Neighbourhood[]
+  selectionGraphRadius: number
+  data: { nodes: NodeExtended[]; links: Link[] } | null
   selectionGraphData: GraphData
   graphStyle: GraphStyle
-  isFetching: boolean
-  hoveredNode: NodeExtendedNew | null
-  selectedNode: NodeExtendedNew | null
+  hoveredNode: NodeExtended | null
+  selectedNodeTypes: string[]
+  selectedLinkTypes: string[]
+  selectedNode: NodeExtended | null
   cameraFocusTrigger: boolean
-  selectedNodeRelativeIds: string[]
-  nearbyNodeIds: string[]
   showSelectionGraph: boolean
-  nodesNormalized: NormalizedNodes
-  edgesNormalized: NormalizedEdges
-  nodeTypes: string[]
-
+  disableCameraRotation: boolean
+  scrollEventsDisabled: boolean
+  isHovering: boolean
+  activeEdge: Link | null
+  activeNode: NodeExtended | null
+  highlightNodes: string[]
+  selectionPath: string[]
+  hoveredNodeSiblings: string[]
+  selectedNodeSiblings: string[]
+  searchQuery: string
+  followersFilter: string
+  isolatedView: string
+  dateRangeFilter: string
   setDisableCameraRotation: (rotation: boolean) => void
-  fetchData: (setBudget: (value: number | null) => void, params?: FetchNodeParams) => void
+  setScrollEventsDisabled: (rotation: boolean) => void
   setData: (data: GraphData) => void
   setGraphStyle: (graphStyle: GraphStyle) => void
-  setGraphRadius: (graphRadius?: number | null) => void
-  setHoveredNode: (hoveredNode: NodeExtendedNew | null) => void
-  setSelectedNode: (selectedNode: NodeExtendedNew | null) => void
-  setSelectedNodeRelativeIds: (ids: string[]) => void
-
+  setGraphRadius: (graphRadius: number) => void
+  setSelectionGraphRadius: (graphRadius: number) => void
+  setHoveredNode: (hoveredNode: NodeExtended | null) => void
+  setSelectedNode: (selectedNode: NodeExtended | null) => void
+  setActiveEdge: (edge: Link | null) => void
+  setActiveNode: (activeNode: NodeExtended | null) => void
+  setHighlightNodes: (highlightNodes: string[]) => void
   setCameraFocusTrigger: (_: boolean) => void
-  setIsFetching: (_: boolean) => void
-  setNearbyNodeIds: (_: string[]) => void
   setShowSelectionGraph: (_: boolean) => void
   setSelectionData: (data: GraphData) => void
-  addNewNode: (node: NodeExtendedNew) => void
-  addNewLink: (node: EdgeExtendedNew) => void
-  removeLink: (refId: string, nodeId: string) => void
+  setIsHovering: (isHovering: boolean) => void
+  addToSelectionPath: (id: string) => void
+  setSearchQuery: (id: string) => void
+  setSelectedNodeTypes: (type: string) => void
+  resetSelectedNodeTypes: () => void
+  setSelectedLinkTypes: (type: string) => void
+  resetSelectedLinkTypes: () => void
+  setFollowersFilter: (filter: string) => void
+  setDateRangeFilter: (filter: string) => void
+  setIsolatedView: (isolatedView: string) => void
+  setNeighbourhoods: (neighbourhoods: Neighbourhood[]) => void
 }
 
 const defaultData: Omit<
   GraphStore,
-  | 'fetchData'
-  | 'setIsFetching'
   | 'setData'
+  | 'setCameraAnimation'
+  | 'setScrollEventsDisabled'
   | 'setDisableCameraRotation'
   | 'setHoveredNode'
   | 'setSelectedNode'
-  | 'setSelectedNodeRelativeIds'
+  | 'setActiveEdge'
+  | 'setActiveNode'
+  | 'setHighlightNodes'
   | 'setCameraFocusTrigger'
   | 'setGraphRadius'
+  | 'setSelectionGraphRadius'
   | 'setGraphStyle'
-  | 'setNearbyNodeIds'
   | 'setShowSelectionGraph'
   | 'setSelectionData'
-  | 'addNewNode'
-  | 'addNewLink'
-  | 'removeLink'
+  | 'setHideNodeDetails'
+  | 'setIsHovering'
+  | 'addToSelectionPath'
+  | 'setSearchQuery'
+  | 'setSelectedNodeTypes'
+  | 'resetSelectedNodeTypes'
+  | 'setSelectedLinkTypes'
+  | 'resetSelectedLinkTypes'
+  | 'setNodesToHide'
+  | 'setFollowersFilter'
+  | 'setDateRangeFilter'
+  | 'setIsolatedView'
+  | 'setNeighbourhoods'
 > = {
   data: null,
   selectionGraphData: { nodes: [], links: [] },
-  disableCameraRotation: false,
-  graphRadius: isChileGraph ? 1600 : 3056, // calculated from initial load
-  graphStyle: (localStorage.getItem('graphStyle') as GraphStyle) || 'sphere',
+  disableCameraRotation: true,
+  scrollEventsDisabled: false,
+  graphRadius: 1500, // calculated from initial load
+  selectionGraphRadius: 200, // calculated from initial load
+  graphStyle: 'sphere',
   hoveredNode: null,
+  hoveredNodeSiblings: [],
+  selectedNodeSiblings: [],
   selectedNode: null,
+  activeEdge: null,
   cameraFocusTrigger: false,
-  selectedNodeRelativeIds: [],
-  nearbyNodeIds: [],
   showSelectionGraph: false,
-  nodesNormalized: {},
-  edgesNormalized: {},
-  isFetching: false,
-  nodeTypes: [],
+  isHovering: false,
+  selectionPath: [],
+  activeNode: null,
+  highlightNodes: [],
+  searchQuery: '',
+  selectedNodeTypes: [],
+  selectedLinkTypes: [],
+  followersFilter: '',
+  dateRangeFilter: '',
+  isolatedView: '',
+  neighbourhoods: [],
 }
 
-export const useGraphStore = create<GraphStore>()(
-  devtools((set, get) => ({
-    ...defaultData,
-    fetchData: async (setBudget, params) => {
-      if (get().isFetching) {
-        return
-      }
+export const useGraphStore = create<GraphStore>()((set, get) => ({
+  ...defaultData,
+  setData: (data) => {
+    set({ data })
+  },
+  setSelectedNodeTypes: (nodeType: string) => {
+    const { selectedNodeTypes } = get()
 
-      set({ isFetching: true })
+    const updatedTypes = selectedNodeTypes.includes(nodeType)
+      ? selectedNodeTypes.filter((i) => i !== nodeType)
+      : [...selectedNodeTypes, nodeType]
 
-      const data = await fetchGraphData(get().graphStyle, setBudget, params ?? {})
+    set({ selectedNodeTypes: updatedTypes })
+  },
+  setSelectedLinkTypes: (linkType: string) => {
+    const { selectedLinkTypes } = get()
 
-      const nodesNormalized: NormalizedNodes = {}
+    const updatedTypes = selectedLinkTypes.includes(linkType)
+      ? selectedLinkTypes.filter((i) => i !== linkType)
+      : [...selectedLinkTypes, linkType]
 
-      data?.nodes.forEach((item) => {
-        const refId = item.ref_id
+    set({ selectedLinkTypes: updatedTypes })
+  },
+  resetSelectedNodeTypes: () => set({ selectedNodeTypes: [] }),
+  resetSelectedLinkTypes: () => set({ selectedLinkTypes: [] }),
+  setSelectionData: (selectionGraphData) => set({ selectionGraphData }),
+  setScrollEventsDisabled: (scrollEventsDisabled) => set({ scrollEventsDisabled }),
+  setDisableCameraRotation: (rotation) => set({ disableCameraRotation: rotation }),
+  setIsHovering: (isHovering) => set({ isHovering }),
+  setGraphRadius: (graphRadius) => set({ graphRadius }),
+  setSelectionGraphRadius: (selectionGraphRadius) => set({ selectionGraphRadius }),
+  setGraphStyle: (graphStyle) => set({ graphStyle }),
+  setHoveredNode: (hoveredNode) => {
+    const { nodesNormalized } = useDataStore.getState() || {}
 
-        if (refId) {
-          nodesNormalized[refId] = item
-        }
-      })
+    if (hoveredNode) {
+      const normalizedNode = nodesNormalized.get(hoveredNode.ref_id)
 
-      const edgesNormalized: NormalizedEdges = {}
+      const siblings = [...(normalizedNode?.targets || []), ...(normalizedNode?.sources || [])]
 
-      data?.links.forEach((item) => {
-        const refId = `${item.source}-${item.target}`
+      set({ hoveredNode, hoveredNodeSiblings: siblings })
+    } else {
+      set({ hoveredNode, hoveredNodeSiblings: [] })
+    }
+  },
+  setActiveEdge: (activeEdge) => {
+    set({ activeEdge })
+  },
+  setActiveNode: (activeNode) => {
+    set({ activeNode })
+  },
+  setHighlightNodes: (highlightNodes) => {
+    set({ highlightNodes })
+  },
+  addToSelectionPath: (id: string) => {
+    const { selectionPath } = get()
 
-        if (refId) {
-          edgesNormalized[refId] = item
-        }
-      })
+    set({ selectionPath: [...selectionPath, id] })
+  },
+  setSelectedNode: (selectedNode) => {
+    const { nodesNormalized } = useDataStore.getState() || {}
 
-      if (params?.word) {
-        await saveSearchTerm()
-      }
-
+    if (!selectedNode) {
       set({
-        data: { nodes: data?.nodes || [], links: data?.links || [] },
-        nodeTypes: data?.nodeTypes,
-        nodesNormalized,
-        edgesNormalized,
-        isFetching: false,
+        hoveredNode: null,
+        selectedNode: null,
         disableCameraRotation: false,
-        nearbyNodeIds: [],
-        selectedNodeRelativeIds: [],
         showSelectionGraph: false,
+        selectionPath: [],
       })
-    },
-    setIsFetching: (isFetching) => set({ isFetching }),
-    setData: (data) => set({ data }),
-    removeLink: (refId, nodeId) => {
-      const { data, selectedNodeRelativeIds } = get()
+    }
 
-      if (data) {
-        const { nodes, links } = data
+    const { selectedNode: stateSelectedNode, selectionPath } = get()
 
-        set({
-          data: { nodes, links: links.filter((l) => l.ref_id !== refId) },
-          selectedNodeRelativeIds: selectedNodeRelativeIds.filter((i) => i !== nodeId),
-        })
-      }
-    },
-    setSelectionData: (selectionGraphData) => set({ selectionGraphData }),
-    setDisableCameraRotation: (rotation) => set({ disableCameraRotation: rotation }),
-    setGraphRadius: (graphRadius) => set({ graphRadius }),
-    setGraphStyle: (graphStyle) => set({ graphStyle }),
-    setHoveredNode: (hoveredNode) => set({ hoveredNode }),
-    setSelectedNode: (selectedNode) => {
-      const stateSelectedNode = get().selectedNode
+    const { simulation } = useSimulationStore.getState()
 
-      if (stateSelectedNode?.ref_id !== selectedNode?.ref_id) {
-        const { data } = get()
+    if (stateSelectedNode?.ref_id !== selectedNode?.ref_id) {
+      const selectedNodeWithCoordinates =
+        simulation?.nodes()?.find((i: NodeExtended) => i.ref_id === selectedNode?.ref_id) || null
 
-        const relativeIds: string[] = []
-
-        if (selectedNode?.ref_id) {
-          data?.links.forEach((i) => {
-            if (i.target === selectedNode?.ref_id) {
-              relativeIds.push(i.source)
-            }
-
-            if (i.source === selectedNode?.ref_id) {
-              relativeIds.push(i.target)
-            }
-          })
-        }
+      if (selectedNode?.ref_id && selectedNodeWithCoordinates) {
+        const normalizedNode: NodeExtended | undefined = nodesNormalized?.get(selectedNode?.ref_id)
 
         set({
           hoveredNode: null,
-          selectedNode,
-          showSelectionGraph: !!selectedNode?.ref_id,
+          selectedNode: { ...selectedNodeWithCoordinates, ...(normalizedNode || {}) },
           disableCameraRotation: true,
-          selectedNodeRelativeIds: relativeIds,
-          ...(!selectedNode?.ref_id ? { selectionGraphData: { nodes: [], links: [] } } : {}),
+          selectionPath: [...selectionPath, selectedNodeWithCoordinates.ref_id],
+          selectedNodeSiblings: [...(normalizedNode?.sources || []), ...(normalizedNode?.targets || [])],
         })
       }
-    },
-    setSelectedNodeRelativeIds: (ids) => set({ selectedNodeRelativeIds: ids }),
-    setCameraFocusTrigger: (cameraFocusTrigger) => set({ cameraFocusTrigger }),
-    setNearbyNodeIds: (nearbyNodeIds) => {
-      const stateNearbyNodeIds = get().nearbyNodeIds
-
-      if (nearbyNodeIds.length !== stateNearbyNodeIds.length || nearbyNodeIds[0] !== stateNearbyNodeIds[0]) {
-        set({ nearbyNodeIds })
-      }
-    },
-    setShowSelectionGraph: (showSelectionGraph) => set({ showSelectionGraph }),
-    addNewNode: (node) => {
-      const { data } = get()
-
-      if (!data) {
-        return
-      }
-
-      const newData = { ...data, nodes: [node, ...data.nodes] }
-
-      set({ data: newData })
-    },
-    addNewLink: (link: EdgeExtendedNew) => {
-      const { data } = get()
-
-      if (!data) {
-        return
-      }
-
-      const nodes = data.nodes.map((i) =>
-        i.ref_id === link.source || i.ref_id === link.target ? { ...i, edge_count: (i.edge_count || 0) + 1 } : i,
-      )
-
-      const links = [...data.links, link]
-
-      const newData = { links, nodes }
-
-      set({ data: newData })
-    },
-  })),
-)
+    }
+  },
+  setCameraFocusTrigger: (cameraFocusTrigger) => set({ cameraFocusTrigger }),
+  setShowSelectionGraph: (showSelectionGraph) => set({ showSelectionGraph }),
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
+  setFollowersFilter: (filter) => set({ followersFilter: filter }),
+  setDateRangeFilter: (filter) => set({ dateRangeFilter: filter }),
+  setIsolatedView: (isolatedView) => set({ isolatedView }),
+  setNeighbourhoods: (neighbourhoods) => set({ neighbourhoods }),
+}))
 
 export const useSelectedNode = () => useGraphStore((s) => s.selectedNode)
+export const useHoveredNode = () => useGraphStore((s) => s.hoveredNode)
+
+export const useSelectedNodeRelativeIds = () => {
+  const selectedNode = useGraphStore((s) => s.selectedNode)
+
+  if (!selectedNode) {
+    return []
+  }
+
+  const { dataInitial } = useDataStore.getState()
+
+  const links = dataInitial?.links || []
+
+  const relativeIds = links.reduce<string[]>((acc, curr) => {
+    if (curr.source === selectedNode?.ref_id) {
+      acc.push(curr.target)
+    }
+
+    if (curr.target === selectedNode?.ref_id) {
+      acc.push(curr.source)
+    }
+
+    return acc
+  }, [])
+
+  return relativeIds
+}

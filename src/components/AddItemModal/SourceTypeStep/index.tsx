@@ -11,13 +11,13 @@ import { OPTIONS, initialValue } from './constants'
 import { Props, TOption } from './types'
 
 export const SourceTypeStep: FC<Props> = ({ skipToStep, allowNextStep, onSelectType, selectedType }) => {
-  const [customSchemaFlag] = useFeatureFlagStore((s) => [s.customSchemaFlag])
+  const [customSchemaFeatureFlag] = useFeatureFlagStore((s) => [s.customSchemaFeatureFlag])
   const [options, setOption] = useState<TOption[] | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const init = async () => {
-      if (customSchemaFlag) {
+      if (customSchemaFeatureFlag) {
         setLoading(true)
 
         try {
@@ -26,12 +26,10 @@ export const SourceTypeStep: FC<Props> = ({ skipToStep, allowNextStep, onSelectT
           const nodeTypesToHide = ['about', 'schema']
 
           const schemaOptions = data.schemas
-            .filter((schema) => !nodeTypesToHide.includes(schema.type) && !schema.is_deleted)
+            .filter((schema) => schema.ref_id && !nodeTypesToHide.includes(schema.type) && !schema.is_deleted)
             .map((schema) => ({
               label: capitalizeString(schema.type),
               value: schema.type,
-              type: schema.type,
-              action: () => skipToStep('setAttribues'),
             }))
 
           setOption(schemaOptions)
@@ -46,10 +44,11 @@ export const SourceTypeStep: FC<Props> = ({ skipToStep, allowNextStep, onSelectT
     }
 
     init()
-  }, [selectedType, customSchemaFlag, skipToStep])
+  }, [selectedType, customSchemaFeatureFlag, skipToStep])
 
   const onSelect = (val: TAutocompleteOption | null) => {
     onSelectType(val?.label || '')
+    skipToStep('setAttribues')
   }
 
   return (

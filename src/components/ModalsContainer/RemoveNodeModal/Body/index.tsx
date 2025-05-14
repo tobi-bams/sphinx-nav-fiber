@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import { ClipLoader } from 'react-spinners'
 import styled from 'styled-components'
 import { Flex } from '~/components/common/Flex'
+import { useNodeNavigation } from '~/components/Universe/useNodeNavigation'
 import { deleteNode, getTopicsData } from '~/network/fetchSourcesData'
-import { useDataStore, useSelectedNode } from '~/stores/useDataStore'
+import { useDataStore } from '~/stores/useDataStore'
+import { useSelectedNode } from '~/stores/useGraphStore'
 import { useModal } from '~/stores/useModalStore'
 import { NodeExtended, Topic } from '~/types'
 import { colors } from '~/utils/colors'
@@ -19,7 +21,8 @@ export const Body = () => {
   const { close: closeEditNodeModal } = useModal('editNodeName')
 
   const [loading, setLoading] = useState(false)
-  const [removeNode, setSelectedNode] = useDataStore((s) => [s.removeNode, s.setSelectedNode])
+  const { navigateToNode } = useNodeNavigation()
+  const [removeNode] = useDataStore((s) => [s.removeNode])
 
   const [topicIsLoading, setTopicIsLoading] = useState(false)
 
@@ -51,7 +54,7 @@ export const Body = () => {
           setActualNode(selectedNode)
         }
       } catch (error) {
-        console.log(error)
+        console.error(error)
       } finally {
         setTopicIsLoading(false)
       }
@@ -64,7 +67,7 @@ export const Body = () => {
     setLoading(true)
 
     try {
-      setSelectedNode(null)
+      navigateToNode(null)
       closeHandler()
       closeEditNodeModal()
     } catch (error) {
@@ -88,17 +91,17 @@ export const Body = () => {
 
     setLoading(true)
 
+    const selectedNodeId = selectedNode?.ref_id as string
+
     try {
       await deleteNode(refId)
 
-      removeNode(refId)
-      setSelectedNode(null)
+      removeNode(selectedNodeId)
+      navigateToNode(null)
 
       closeHandler()
       closeEditNodeModal()
     } catch (error) {
-      console.log(error)
-
       console.warn(error)
     } finally {
       setLoading(false)
@@ -130,7 +133,11 @@ export const Body = () => {
             variant="contained"
           >
             Delete
-            {loading && <ClipLoader color={colors.BLUE_PRESS_STATE} size={10} />}
+            {loading && (
+              <ClipLoaderWrapper>
+                <ClipLoader color={colors.lightGray} size={12} />
+              </ClipLoaderWrapper>
+            )}
           </DeleteButton>
         </Flex>
       )}
@@ -168,4 +175,8 @@ const DeleteButton = styled(Button)`
       background-color: ${colors.primaryRed};
     }
   }
+`
+
+const ClipLoaderWrapper = styled.span`
+  margin-top: 2px;
 `

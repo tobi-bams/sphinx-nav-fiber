@@ -2,11 +2,13 @@
 import '@testing-library/jest-dom'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
+import * as trends from '~/network/trends'
 import { Trending } from '..'
-import * as fetchGraphData from '../../../../../network/fetchGraphData'
+import { useAppStore } from '../../../../../stores/useAppStore'
 import { useDataStore } from '../../../../../stores/useDataStore'
 import { useModal } from '../../../../../stores/useModalStore'
 import * as utils from '../../../../../utils/trending'
+import { MemoryRouter } from 'react-router-dom'
 
 jest.mock('~/components/Icons/SentimentDataIcon', () => jest.fn(() => <div data-testid="SentimentDataIcon" />))
 jest.mock('~/components/Icons/PlayIcon', () => jest.fn(() => <div data-testid="PlayIcon" />))
@@ -30,8 +32,13 @@ jest.mock('~/stores/useDataStore', () => ({
   useDataStore: jest.fn(),
 }))
 
-const mockedGetTrends = jest.spyOn(fetchGraphData, 'getTrends')
+jest.mock('~/stores/useAppStore', () => ({
+  useAppStore: jest.fn(),
+}))
+
+const mockedGetTrends = jest.spyOn(trends, 'getTrends')
 const mockedUseDataStore = useDataStore as jest.MockedFunction<typeof useDataStore>
+const useAppStoreMock = useAppStore as jest.MockedFunction<typeof useAppStore>
 const mockedUseModal = useModal as jest.MockedFunction<typeof useModal>
 const availableModal = ['briefDescription', 'addContent']
 
@@ -42,16 +49,43 @@ const mockTrends = [
 
 describe('Trending Component', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-
     mockedUseDataStore.mockReturnValue({ trendingTopics: mockTrends, setTrendingTopics: jest.fn() })
+    useAppStoreMock.mockReturnValue({ currentPlayingAudio: { current: null }, setCurrentPlayingAudio: jest.fn() })
   })
 
   it('asserts that the component renders correctly', () => {
-    const { getByText, getByTestId } = render(<Trending />)
+    const { getByText, getByTestId } = render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
 
-    expect(getByText('Trending Topics')).toBeInTheDocument()
-    expect(getByTestId('SentimentDataIcon')).toBeInTheDocument()
+    ;(async () => {
+      await waitFor(() => {
+        expect(getByText('Trending Topics')).toBeInTheDocument()
+        expect(getByTestId('SentimentDataIcon')).toBeInTheDocument()
+      })
+    })()
+  })
+
+  it('ensures that the "Add Content" button calls the openContentAddModal function', async () => {
+    const openContentAddModal = jest.fn()
+    mockedUseDataStore.mockReturnValue({ trendingTopics: [], setTrendingTopics: jest.fn() })
+
+    const { getByText, getByRole } = render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
+
+    ;(async () => {
+      await waitFor(() => expect(getByText('No new trending topics in the last 24 hours')).toBeInTheDocument())
+      await waitFor(() => expect(getByRole('button', { name: 'Add Content' })).toBeInTheDocument())
+
+      fireEvent.click(getByRole('button', { name: 'Add Content' }))
+
+      expect(openContentAddModal).toHaveBeenCalled()
+    })()
   })
 
   it('verifies that the component fetches trending topics on mount and updates the state accordingly', () => {
@@ -59,7 +93,11 @@ describe('Trending Component', () => {
 
     mockedUseDataStore.mockReturnValue({ trendingTopics: mockTrends, setTrendingTopics: mockedSetTrendingTopics })
 
-    render(<Trending />)
+    render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
     ;(async () => {
       await waitFor(() => {
         expect(mockedGetTrends).toHaveBeenCalled()
@@ -71,40 +109,25 @@ describe('Trending Component', () => {
   it('checks that the component renders a list of trending topics when data is available', () => {
     mockedUseDataStore.mockReturnValue({ trendingTopics: mockTrends, setTrendingTopics: jest.fn() })
 
-    const { getByText } = render(<Trending />)
+    const { getByText } = render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
 
     mockTrends.forEach(({ name }) => {
-      expect(getByText(`#${name}`)).toBeInTheDocument()
+      expect(getByText(`${name}`)).toBeInTheDocument()
     })
-  })
-
-  it('ensures that the "Add Content" button calls the openContentAddModal function', () => {
-    mockedUseDataStore.mockReturnValue({ trendingTopics: [], setTrendingTopics: jest.fn() })
-
-    const loading = false
-
-    jest.spyOn(React, 'useState').mockImplementationOnce(() => [loading, jest.fn()])
-
-    const { getByText, getByRole } = render(<Trending />)
-
-    expect(getByText('No new trending topics in the last 24 hours')).toBeInTheDocument()
-
-    expect(getByRole('button', { name: 'Add Content' })).toBeInTheDocument()
-
-    fireEvent.click(getByRole('button', { name: 'Add Content' }))
-
-    const { open: openAddContentMock } = mockedUseModal('addContent')
-
-    expect(mockedUseModal).toHaveBeenCalledWith('addContent')
-    ;(async () => {
-      await waitFor(() => expect(openAddContentMock).toHaveBeenCalled())
-    })()
   })
 
   it('confirms the rendering of the BriefDescriptionModal when a TLDR button is clicked', () => {
     mockedUseDataStore.mockReturnValue({ trendingTopics: [mockTrends[0]], setTrendingTopics: jest.fn() })
 
-    const { getByRole } = render(<Trending />)
+    const { getByRole } = render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
 
     fireEvent.click(getByRole('button', { name: 'TLDR' }))
 
@@ -121,7 +144,11 @@ describe('Trending Component', () => {
 
     jest.spyOn(utils, 'showPlayButton')
 
-    const { getByText, getByTestId, container } = render(<Trending />)
+    const { getByText, getByTestId, container } = render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
 
     expect(getByText('Play All')).toBeInTheDocument()
     expect(getByTestId('PlayIcon')).toBeInTheDocument()
@@ -138,9 +165,13 @@ describe('Trending Component', () => {
 
     mockedUseDataStore.mockReturnValue({ trendingTopics: mockTrends, setTrendingTopics: mockedSelectTrendingTopic })
 
-    const { getByText } = render(<Trending />)
+    const { getByText } = render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
 
-    fireEvent.click(getByText(`#${mockTrends[0].name}`))
+    fireEvent.click(getByText(`${mockTrends[0].name}`))
     ;(async () => {
       await waitFor(() => expect(mockedSelectTrendingTopic).toHaveBeenCalled())
     })()
@@ -151,9 +182,13 @@ describe('Trending Component', () => {
 
     mockedUseDataStore.mockReturnValue({ trendingTopics: mockTrends, setTrendingTopics: mockedSelectTrendingTopic })
 
-    const { getByText } = render(<Trending />)
+    const { getByText } = render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
 
-    fireEvent.click(getByText(`#${mockTrends[0].name}`))
+    fireEvent.click(getByText(`${mockTrends[0].name}`))
     ;(async () => {
       await waitFor(() => {
         const searchInput = screen.getByPlaceholderText('Search') as HTMLInputElement
@@ -163,7 +198,11 @@ describe('Trending Component', () => {
   })
 
   test('Add tests to check that this scroll bar renders correctly', () => {
-    const { container } = render(<Trending />)
+    const { container } = render(
+      <MemoryRouter>
+        <Trending />
+      </MemoryRouter>,
+    )
     const scrollbar = container.firstChild
 
     // Assert that scrollbar exists

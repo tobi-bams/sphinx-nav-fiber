@@ -1,6 +1,9 @@
-import { fireEvent, render } from '@testing-library/react'
+/* eslint-disable padding-line-between-statements */
+import '@testing-library/jest-dom'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import React from 'react'
 import { BudgetStep } from '..'
+import { api } from '../../../../network/api'
 import * as fetchSourcesDataModule from '../../../../network/fetchSourcesData'
 
 jest.mock('../../../../network/fetchSourcesData')
@@ -40,7 +43,7 @@ describe('Rendering', () => {
   })
 
   test('displays the correct formatted budget', () => {
-    const { getByText } = render(<BudgetStep loading={false} onClick={() => null} />)
+    const { getByText } = render(<BudgetStep loading={false} onClick={() => null} type="link" />)
 
     expect(getByText('10 sats')).toBeInTheDocument()
   })
@@ -55,7 +58,7 @@ describe('Rendering', () => {
     mockGetPriceData.mockResolvedValue(mockPrice)
 
     const { findByText, getByText, getByTestId, queryByText } = render(
-      <BudgetStep loading={false} onClick={() => null} />,
+      <BudgetStep loading={false} onClick={() => null} type="link" />,
     )
 
     const mockPriceRes = await mockGetPriceData()
@@ -76,7 +79,7 @@ describe('Behavior', () => {
   test('calls onClick when "Approve" button is clicked and not loading', () => {
     const onClickMock = jest.fn()
 
-    const { getByTestId } = render(<BudgetStep loading={false} onClick={onClickMock} />)
+    const { getByTestId } = render(<BudgetStep loading={false} onClick={onClickMock} type="link" />)
 
     fireEvent.click(getByTestId('check-icon'))
 
@@ -84,10 +87,33 @@ describe('Behavior', () => {
   })
 
   test('disables "Approve" button when loading is true', () => {
-    const { getByText } = render(<BudgetStep loading onClick={() => null} />)
+    const { getByText } = render(<BudgetStep loading onClick={() => null} type="link" />)
 
     const approveButton = getByText('Approve')
 
     expect(approveButton).toBeDisabled()
+  })
+
+  test('displays API error message when node already exists', async () => {
+    const mockApiError = {
+      response: {
+        status: 400,
+        data: {
+          errorCode: 'Node already exists in the graph',
+        },
+      },
+    }
+
+    const mockSubmit = jest.fn().mockRejectedValue(mockApiError)
+    jest.spyOn(api, 'post').mockImplementation(mockSubmit)
+
+    const { getByText, findByText } = render(<BudgetStep loading={false} onClick={() => null} type="link" />)
+
+    const approveButton = await findByText('Approve')
+    fireEvent.click(approveButton)
+
+    waitFor(() => {
+      expect(getByText('Node already exists in the graph')).toBeInTheDocument()
+    })
   })
 })

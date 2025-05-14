@@ -3,26 +3,29 @@ import { FC, useEffect, useState } from 'react'
 import { useFormContext } from 'react-hook-form'
 import { ClipLoader } from 'react-spinners'
 import styled from 'styled-components'
+import { noSpacePattern } from '~/components/AddItemModal/SourceTypeStep/constants'
+import { parseJson, parsedObjProps } from '~/components/ModalsContainer/BlueprintModal/Body/Editor/utils'
 import { Flex } from '~/components/common/Flex'
 import { Text } from '~/components/common/Text'
 import { TextInput } from '~/components/common/TextInput'
+import { requiredRule } from '~/constants'
 import { getNodeType } from '~/network/fetchSourcesData'
 import { colors } from '~/utils'
 import { AddItemModalStepID } from '..'
-import { parseJson, parsedObjProps } from '../../AddTypeModal/utils'
-import { requiredRule } from '~/constants'
 
 type Props = {
   skipToStep: (step: AddItemModalStepID) => void
   nodeType: string
+  handleSelectType: (val: string) => void
 }
 
-export const SetAttributesStep: FC<Props> = ({ skipToStep, nodeType }) => {
+export const SetAttributesStep: FC<Props> = ({ handleSelectType, skipToStep, nodeType }) => {
   const [loading, setLoading] = useState(false)
   const [attributes, setAttributes] = useState<parsedObjProps[]>()
 
   const {
     watch,
+    setValue,
     formState: { isValid },
   } = useFormContext()
 
@@ -32,9 +35,12 @@ export const SetAttributesStep: FC<Props> = ({ skipToStep, nodeType }) => {
 
       const data = await getNodeType(nodeType)
 
-      const parsedData = parseJson(data)
+      const parsedData =
+        data.attributes && typeof data.attributes === 'object' ? parseJson(data.attributes) : parseJson(data)
 
-      setAttributes(parsedData)
+      const filteredAttributes = parsedData.filter((attr) => attr.key !== 'node_key')
+
+      setAttributes(filteredAttributes)
 
       setLoading(false)
     }
@@ -43,6 +49,41 @@ export const SetAttributesStep: FC<Props> = ({ skipToStep, nodeType }) => {
   }, [nodeType, watch])
 
   const capitalizeFirstLetter = (string: string) => string.charAt(0).toUpperCase() + string.slice(1).replace(/_/g, ' ')
+
+  const sortedAttributes = attributes
+    ? [...attributes].sort((a, b) => {
+        if (a.required && !b.required) {
+          return -1
+        }
+
+        if (!a.required && b.required) {
+          return 1
+        }
+
+        return 0
+      })
+    : []
+
+  const handlePrevButton = () => {
+    handleSelectType('')
+    skipToStep('sourceType')
+  }
+
+  const handleNextButton = () => {
+    attributes?.forEach(({ key, required }) => {
+      if (required) {
+        const value = watch(key)
+
+        if (typeof value === 'string') {
+          setValue(key, value.trim(), { shouldValidate: true })
+        }
+      }
+    })
+
+    if (isValid && !loading && attributes?.every((attr) => !attr.required || watch(attr.key))) {
+      skipToStep('setBudget')
+    }
+  }
 
   return (
     <Flex>
@@ -55,24 +96,31 @@ export const SetAttributesStep: FC<Props> = ({ skipToStep, nodeType }) => {
       <StyledWrapper>
         {loading ? (
           <Flex style={{ margin: 'auto' }}>
-            <ClipLoader color={colors.SECONDARY_BLUE} />
+            <ClipLoader color={colors.lightGray} />
           </Flex>
         ) : (
           <Flex className="input__wrapper">
-            {attributes?.map(({ key, required }: parsedObjProps) => (
-              <>
-                <TextFeildWrapper>
-                  <Text>{capitalizeFirstLetter(key)}</Text>
-                  <TextInput
-                    id="item-name"
-                    name={key}
-                    placeholder={required ? 'Required' : 'Optional'}
-                    rules={{
-                      ...(required ? requiredRule : {}),
-                    }}
-                  />
-                </TextFeildWrapper>
-              </>
+            {sortedAttributes?.map(({ key, required }: parsedObjProps) => (
+              <TextFieldWrapper key={key}>
+                <Text>{capitalizeFirstLetter(key)}</Text>
+                <TextInput
+                  id="item-name"
+                  maxLength={50}
+                  name={key}
+                  placeholder={required ? 'Required' : 'Optional'}
+                  rules={{
+                    ...(required
+                      ? {
+                          ...requiredRule,
+                          pattern: {
+                            message: 'No leading whitespace allowed',
+                            value: noSpacePattern,
+                          },
+                        }
+                      : {}),
+                  }}
+                />
+              </TextFieldWrapper>
             ))}
           </Flex>
         )}
@@ -80,7 +128,7 @@ export const SetAttributesStep: FC<Props> = ({ skipToStep, nodeType }) => {
 
       <Flex direction="row">
         <Flex grow={1}>
-          <Button color="secondary" onClick={() => skipToStep('sourceType')} size="large" variant="contained">
+          <Button color="secondary" onClick={handlePrevButton} size="large" variant="contained">
             Prev
           </Button>
         </Flex>
@@ -88,7 +136,7 @@ export const SetAttributesStep: FC<Props> = ({ skipToStep, nodeType }) => {
           <Button
             color="secondary"
             disabled={!isValid || loading || attributes?.some((attr) => attr.required && !watch(attr.key))}
-            onClick={() => skipToStep('setBudget')}
+            onClick={handleNextButton}
             size="large"
             variant="contained"
           >
@@ -123,7 +171,7 @@ const StyledWrapper = styled(Flex)`
   }
 `
 
-const TextFeildWrapper = styled(Flex)`
+const TextFieldWrapper = styled(Flex)`
   display: flex;
   gap: 10px;
 

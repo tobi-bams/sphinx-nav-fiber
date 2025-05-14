@@ -1,30 +1,19 @@
-import invariant from 'invariant'
-import { PropsWithChildren, useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
 import { Vector3 } from 'three'
-import { useDataStore, useSelectedNode } from '~/stores/useDataStore'
-import { useUserStore } from '~/stores/useUserStore'
+import { useGraphStore, useSelectedNode } from '~/stores/useGraphStore'
+import { useSimulationStore } from '~/stores/useSimulationStore'
 import { NodeExtended } from '~/types'
 import { PATHWAY_RANGE } from './constants'
 
-type Props = PropsWithChildren
-
-export const DataRetriever = ({ children }: Props) => {
-  const { fetchData } = useDataStore((s) => s)
-  const [setBudget] = useUserStore((s) => [s.setBudget])
-
-  useEffect(() => {
-    fetchData(setBudget)
-  }, [fetchData, setBudget])
-
-  return <>{children}</>
-}
-
 export const useGraphData = () => {
-  const data = useDataStore((s) => s.data)
+  const { simulation, getLinks } = useSimulationStore((s) => s)
 
-  invariant(data !== null, 'This hook is meant to be used inside a DataRetriever component')
+  // invariant(data !== null, 'This hook is meant to be used inside a DataRetriever component')
 
-  return data
+  return {
+    nodes: simulation?.nodes() || [],
+    links: getLinks(),
+  }
 }
 
 type BadgeProps = {
@@ -36,7 +25,7 @@ type BadgeProps = {
 export const usePathway = () => {
   const selectedNode = useSelectedNode()
 
-  return useDataStore(
+  return useGraphStore(
     useCallback(
       (s) => {
         const nodes = s.showSelectionGraph ? [] : s.data!.nodes || []

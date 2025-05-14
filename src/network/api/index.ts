@@ -1,29 +1,26 @@
 import { getSignedMessageFromRelay } from '~/utils'
 import { API_URL } from '~/utils/apiUrlFromSwarmHost'
 
-const request = async <Res>(url: string, config?: RequestInit): Promise<Res> => {
-  const admin = localStorage?.getItem('admin')
-
+export const request = async <Res>(url: string, config?: RequestInit, signal?: AbortSignal): Promise<Res> => {
   let updatedUrl = url
 
-  if (admin) {
-    const newUrl = new URL(url)
+  const newUrl = new URL(url)
 
-    const existingParams = new URLSearchParams(newUrl.search)
+  const existingParams = new URLSearchParams(newUrl.search)
 
-    if (!existingParams.has('sig') && !existingParams.has('msg')) {
-      const adminAuth = await getSignedMessageFromRelay()
+  const adminAuth = await getSignedMessageFromRelay()
 
-      existingParams.append('sig', adminAuth.signature)
-      existingParams.append('msg', adminAuth.message)
+  existingParams.append('sig', adminAuth.signature)
+  existingParams.append('msg', adminAuth.message)
 
-      newUrl.search = existingParams.toString()
+  newUrl.search = existingParams.toString()
 
-      updatedUrl = newUrl.toString()
-    }
-  }
+  updatedUrl = newUrl.toString()
 
-  const response = await fetch(updatedUrl, config)
+  const controller = new AbortController()
+  const mergedSignal = signal || controller.signal
+
+  const response = await fetch(updatedUrl, { ...config, signal: mergedSignal })
 
   if (!response.ok) {
     throw response
@@ -33,32 +30,54 @@ const request = async <Res>(url: string, config?: RequestInit): Promise<Res> => 
 }
 
 export const api = {
-  delete: <Res>(endpoint: string, headers?: RequestInit['headers']) =>
-    request<Res>(`${API_URL}${endpoint}`, {
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
+  delete: <Res>(endpoint: string, headers?: RequestInit['headers'], signal?: AbortSignal) =>
+    request<Res>(
+      `${API_URL}${endpoint}`,
+      {
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        method: 'DELETE',
       },
-      method: 'DELETE',
-    }),
-  get: <Res>(endpoint: string, headers?: RequestInit['headers']) =>
-    request<Res>(`${API_URL}${endpoint}`, headers ? { headers } : undefined),
-  post: <TBody extends RequestInit['body'], Res>(endpoint: string, body: TBody, headers?: RequestInit['headers']) =>
-    request<Res>(`${API_URL}${endpoint}`, {
-      body,
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
+      signal,
+    ),
+  get: <Res>(endpoint: string, headers?: RequestInit['headers'], signal?: AbortSignal) =>
+    request<Res>(`${API_URL}${endpoint}`, headers ? { headers } : undefined, signal),
+  post: <TBody extends RequestInit['body'], Res>(
+    endpoint: string,
+    body: TBody,
+    headers?: RequestInit['headers'],
+    signal?: AbortSignal,
+  ) =>
+    request<Res>(
+      `${API_URL}${endpoint}`,
+      {
+        body,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
       },
-      method: 'POST',
-    }),
-  put: <TBody extends RequestInit['body'], Res>(endpoint: string, body: TBody, headers?: RequestInit['headers']) =>
-    request<Res>(`${API_URL}${endpoint}`, {
-      body,
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
+      signal,
+    ),
+  put: <TBody extends RequestInit['body'], Res>(
+    endpoint: string,
+    body: TBody,
+    headers?: RequestInit['headers'],
+    signal?: AbortSignal,
+  ) =>
+    request<Res>(
+      `${API_URL}${endpoint}`,
+      {
+        body,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        method: 'PUT',
       },
-      method: 'PUT',
-    }),
+      signal,
+    ),
 }

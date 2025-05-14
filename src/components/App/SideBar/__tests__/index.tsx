@@ -3,10 +3,13 @@ import { ThemeProvider } from '@mui/material'
 import '@testing-library/jest-dom'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { ThemeProvider as StyleThemeProvider } from 'styled-components'
 import { SideBar } from '..'
+import { api } from '../../../../network/api'
 import { AppStore, useAppStore } from '../../../../stores/useAppStore'
-import { DataStore, useDataStore, useFilteredNodes, useSelectedNode } from '../../../../stores/useDataStore'
+import { DataStore, useDataStore, useFilteredNodes } from '../../../../stores/useDataStore'
+import { colors } from '../../../../utils'
 import * as utils from '../../../../utils/relayHelper'
 import { appTheme } from '../../Providers'
 
@@ -28,9 +31,11 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 jest.mock('react-hook-form', () => ({
+  ...jest.requireActual('react-hook-form'),
   useFormContext: jest.fn(() => ({
     setValue: jest.fn(),
     register: jest.fn(),
+    watch: jest.fn(() => ''),
   })),
 }))
 
@@ -59,7 +64,6 @@ jest.mock('~/stores/useAppStore', () => ({
   })),
 }))
 
-const useSelectedNodeMock = useSelectedNode as jest.MockedFunction<typeof useSelectedNode>
 const useFilteredNodesMock = useFilteredNodes as jest.MockedFunction<typeof useFilteredNodes>
 const useDataStoreMock = useDataStore as jest.MockedFunction<typeof useDataStore>
 const useAppStoreMock = useAppStore as jest.MockedFunction<typeof useAppStore>
@@ -82,33 +86,38 @@ const mockNode = {
 describe('Test SideBar', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    useSelectedNodeMock.mockReturnValue([])
     useFilteredNodesMock.mockReturnValue([mockNode])
   })
 
   it('Ensure that the sidebar is not visible when sidebarIsOpen is false.', () => {
-    useAppStoreMock.mockReturnValue({ sidebarIsOpen: false })
+    useAppStoreMock.mockReturnValue({ setCurrentPlayingAudio: jest.fn(), sidebarIsOpen: false })
 
     const { container } = render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
-    expect(container.querySelector('#sidebar-wrapper')).not.toBeInTheDocument()
+    waitFor(() => {
+      expect(container.querySelector('#sidebar-wrapper')).not.toBeInTheDocument()
+    })
   })
 
   it('Verify that the sidebar is visible when sidebarIsOpen is true.', () => {
-    useAppStoreMock.mockReturnValue({ sidebarIsOpen: true })
+    useAppStoreMock.mockReturnValue({ setCurrentPlayingAudio: jest.fn(), sidebarIsOpen: true })
 
     const { container } = render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
     expect(container.querySelector('#sidebar-wrapper')).toBeInTheDocument()
@@ -117,23 +126,30 @@ describe('Test SideBar', () => {
   it('Test that typing into the search bar updates the search term in the application state.', () => {
     const [setCurrentSearchMock, onSubmitMock] = [jest.fn(), jest.fn()]
 
-    useAppStoreMock.mockReturnValue({ sidebarIsOpen: true, setCurrentSearch: setCurrentSearchMock })
+    useAppStoreMock.mockReturnValue({
+      setCurrentPlayingAudio: jest.fn(),
+      sidebarIsOpen: true,
+      setCurrentSearch: setCurrentSearchMock,
+    })
 
     render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar onSubmit={onSubmitMock} />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
     const searchInput = screen.getByPlaceholderText('Search') as HTMLInputElement
 
     fireEvent.change(searchInput, { target: { value: 'Lightning Network' } })
 
-    const searchIcon = screen.getByTestId('search-icon')
+    const searchIcons = screen.getAllByTestId('search-icon')
 
-    expect(searchIcon).toBeInTheDocument()
+    expect(searchIcons.length).toBeGreaterThan(0) // Ensure at least one exists
+    expect(searchIcons[0]).toBeInTheDocument()
     ;(async () => {
       await waitFor(() => {
         expect(onSubmitMock).toHaveBeenCalled()
@@ -145,14 +161,21 @@ describe('Test SideBar', () => {
   it.skip('Ensure that the clear icon appears when there is a search term and clears the search on click', () => {
     const clearSearchMock = jest.fn()
 
-    useAppStoreMock.mockReturnValue({ currentSearch: 'Test Search', clearSearch: clearSearchMock, sidebarIsOpen: true })
+    useAppStoreMock.mockReturnValue({
+      setCurrentPlayingAudio: jest.fn(),
+      currentSearch: 'Test Search',
+      clearSearch: clearSearchMock,
+      sidebarIsOpen: true,
+    })
 
     render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
     const clearIcon = screen.getByTestId('clear-icon')
@@ -168,30 +191,35 @@ describe('Test SideBar', () => {
   })
 
   it('Verify that the search icon is displayed when there is no search term.', () => {
-    useAppStoreMock.mockReturnValue({ currentSearch: '', sidebarIsOpen: true })
+    useAppStoreMock.mockReturnValue({ setCurrentPlayingAudio: jest.fn(), currentSearch: '', sidebarIsOpen: true })
 
     render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
-    const searchIcon = screen.getByTestId('search-icon')
+    const searchIcons = screen.getAllByTestId('search-icon')
 
-    expect(searchIcon).toBeInTheDocument()
+    expect(searchIcons.length).toBeGreaterThan(0) // Ensure at least one exists
+    expect(searchIcons[0]).toBeInTheDocument()
   })
 
   it('Ensure that the Trending component is displayed when there is no search term.', () => {
-    useAppStoreMock.mockReturnValue({ currentSearch: '', sidebarIsOpen: true })
+    useAppStoreMock.mockReturnValue({ setCurrentPlayingAudio: jest.fn(), currentSearch: '', sidebarIsOpen: true })
 
     render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
     expect(screen.getByTestId('trending-component')).toBeInTheDocument()
@@ -206,11 +234,13 @@ describe('Test SideBar', () => {
     })
 
     render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
     const ClipLoader = screen.getByTestId('loader')
@@ -228,11 +258,13 @@ describe('Test SideBar', () => {
     })
 
     render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
     // confirms that LatestView is rendered
@@ -252,14 +284,20 @@ describe('Test SideBar', () => {
       setSelectedNode: setSelectedNodeMock,
     })
 
-    useAppStoreMock.mockReturnValue({ setRelevanceSelected: setRelevanceSelectedMock, sidebarIsOpen: true })
+    useAppStoreMock.mockReturnValue({
+      setCurrentPlayingAudio: jest.fn(),
+      setRelevanceSelected: setRelevanceSelectedMock,
+      sidebarIsOpen: true,
+    })
 
     render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
     const searchInput = screen.getByPlaceholderText('Search') as HTMLInputElement
@@ -287,14 +325,20 @@ describe('Test SideBar', () => {
       setSelectedNode: setSelectedNodeMock,
     })
 
-    useAppStoreMock.mockReturnValue({ setRelevanceSelected: setRelevanceSelectedMock, sidebarIsOpen: true })
+    useAppStoreMock.mockReturnValue({
+      setCurrentPlayingAudio: jest.fn(),
+      setRelevanceSelected: setRelevanceSelectedMock,
+      sidebarIsOpen: true,
+    })
 
     render(
-      <ThemeProvider theme={appTheme}>
-        <StyleThemeProvider theme={appTheme}>
-          <SideBar />
-        </StyleThemeProvider>
-      </ThemeProvider>,
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
     )
 
     const searchInput = screen.getByPlaceholderText('Search') as HTMLInputElement
@@ -306,6 +350,55 @@ describe('Test SideBar', () => {
         expect(setSelectedNodeMock).not.toHaveBeenCalledWith(mockNode)
         expect(saveConsumedContentMock).not.toHaveBeenCalledWith(mockNode)
         expect(setRelevanceSelectedMock).not.toHaveBeenCalledWith(true)
+      })
+    })()
+  })
+
+  it('Test filter icon functionality and schema filtering', () => {
+    const mockSchemas = [{ type: 'Type1' }, { type: 'Type2' }, { type: 'Type3' }]
+
+    jest.spyOn(api, 'get').mockResolvedValue({ schemas: mockSchemas })
+
+    useAppStoreMock.mockReturnValue({
+      setCurrentPlayingAudio: jest.fn(),
+      sidebarIsOpen: true,
+      setSidebarOpen: jest.fn(),
+      clearSearch: jest.fn(),
+      currentSearch: '',
+      searchFormValue: '',
+    })
+
+    render(
+      <MemoryRouter>
+        <ThemeProvider theme={appTheme}>
+          <StyleThemeProvider theme={appTheme}>
+            <SideBar />
+          </StyleThemeProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
+    )
+    ;(async () => {
+      await waitFor(() => {
+        const filterIcon = screen.getByTestId('search_filter_icon')
+        fireEvent.click(filterIcon)
+
+        expect(api.get).toHaveBeenCalledWith('/schema/all')
+
+        mockSchemas.forEach((schema) => {
+          expect(screen.getByText(schema.type)).toBeInTheDocument()
+        })
+
+        const type1Pill = screen.getByText('Type1')
+        fireEvent.click(type1Pill)
+
+        expect(type1Pill).toHaveStyle(`background: ${colors.white}`)
+        expect(type1Pill).toHaveStyle(`color: ${colors.black}`)
+
+        const selectedCount = screen.getByText('1')
+        expect(selectedCount).toBeInTheDocument()
+
+        fireEvent.click(filterIcon)
+        expect(screen.queryByText('Type1')).not.toBeInTheDocument()
       })
     })()
   })

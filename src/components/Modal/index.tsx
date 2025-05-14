@@ -25,6 +25,11 @@ const getModalKindStyles = ({ kind = 'regular' }: Pick<Props, 'kind'>) => {
       return css`
         width: 709px;
       `
+    case 'full':
+      return css`
+        width: 100%;
+        height: 100%;
+      `
     default:
       return css`
         width: 520px;
@@ -35,13 +40,28 @@ const getModalKindStyles = ({ kind = 'regular' }: Pick<Props, 'kind'>) => {
 const ModalContainer = styled(Flex)<Pick<Props, 'kind'>>`
   z-index: 2000;
   margin: 0 auto;
-  overflow: visible;
   animation: ${scaleAnimation} 0.2s ease-in-out;
   position: relative;
   max-width: 100%;
   overflow: visible;
+  box-sizing: border-box;
   background: ${colors.BG1};
-  ${getModalKindStyles}
+  ${getModalKindStyles};
+
+  @media (max-width: 1024px) {
+    height: auto;
+    max-height: 80%;
+  }
+
+  @media (max-width: 768px) {
+    height: auto;
+    max-height: 80%;
+  }
+
+  @media (max-width: 480px) {
+    height: auto;
+    max-height: 80%;
+  }
 `
 
 const fadeAnimation = keyframes`
@@ -66,6 +86,7 @@ const Bg = styled(Flex)<{ hideBg?: boolean }>`
   z-index: 1500;
   animation: ${fadeAnimation} 0.2s ease-in-out;
   padding: 1rem;
+  box-sizing: border-box;
 
   ${({ hideBg }) =>
     !hideBg &&
@@ -84,7 +105,7 @@ const CloseButton = styled(Flex)`
   z-index: 1;
 `
 
-export type ModalKind = 'small' | 'regular' | 'large'
+export type ModalKind = 'small' | 'regular' | 'large' | 'full'
 
 type Props = PropsWithChildren<{
   id: AvailableModals
@@ -132,6 +153,7 @@ export const BaseModal = ({
     <>
       <Bg
         align="center"
+        data-testid="modal-overlay"
         hideBg={hideBg}
         justify="center"
         onClick={(e) => {

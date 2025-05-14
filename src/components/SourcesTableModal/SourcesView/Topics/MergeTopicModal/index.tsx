@@ -6,39 +6,39 @@ import { BaseModal } from '~/components/Modal'
 import { postMergeTopics } from '~/network/fetchSourcesData'
 import { useModal } from '~/stores/useModalStore'
 import { useTopicsStore } from '~/stores/useTopicsStore'
-import { Topic } from '~/types'
+import { TEdge, Topic } from '~/types'
 import { colors } from '~/utils/colors'
-import { IS_ALIAS } from '../../constants'
 import { TitleEditor } from './Title'
+import styled from 'styled-components'
 
 type Props = {
-  topic: Topic
   onClose: () => void
+  multiTopics: Topic[]
 }
 
 export type FormData = {
-  topic: string
+  name: string
 }
 
-export const MergeTopicModal: FC<Props> = ({ topic, onClose }) => {
+export const MergeTopicModal: FC<Props> = ({ onClose, multiTopics }) => {
   const { close } = useModal('mergeTopic')
-  const [data, ids, total] = useTopicsStore((s) => [s.data, s.ids, s.total])
   const form = useForm<FormData>({ mode: 'onChange' })
-  const { watch, setValue, reset } = form
+  const { setValue, reset } = form
   const [loading, setLoading] = useState(false)
-  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
+  const [isSwapped, setIsSwapped] = useState(false)
+  const [selectedToNode, setSelectedToNode] = useState<TEdge | null>(null)
 
   useEffect(() => {
-    if (topic) {
-      setValue('topic', topic?.name)
+    if (multiTopics && multiTopics.length > 0) {
+      const topicNames = multiTopics.map((t) => t.name).join(', ')
+
+      setValue('name', topicNames)
     }
 
     return () => {
       reset()
     }
-  }, [topic, setValue, reset])
-
-  const topicValue = watch('topic')
+  }, [multiTopics, setValue, reset])
 
   const closeHandler = () => {
     onClose()
@@ -46,30 +46,21 @@ export const MergeTopicModal: FC<Props> = ({ topic, onClose }) => {
   }
 
   const handleSave = async () => {
-    if (!selectedTopic || !data) {
-      return
-    }
-
     setLoading(true)
 
+    const fromIds = multiTopics?.map((t) => t.ref_id).filter((id): id is string => !!id)
+
     try {
-      await postMergeTopics({ from: topic.ref_id, to: selectedTopic?.ref_id })
+      if (fromIds.length && selectedToNode) {
+        await postMergeTopics({ from: fromIds, to: selectedToNode?.ref_id })
 
-      const { ref_id: id } = topic
+        useTopicsStore.setState((prev) => ({
+          ids: prev.ids.filter((id) => !fromIds.includes(id)),
+          total: prev.total - fromIds.length,
+        }))
 
-      data[id] = { ...data[id], edgeList: [IS_ALIAS], edgeCount: data[id].edgeCount - 1 }
-
-      useTopicsStore.setState({ ids: ids.filter((i) => i !== selectedTopic.ref_id), total: total - 1 })
-
-      if (data) {
-        const newData = { ...data }
-
-        newData[topic?.ref_id].name = topicValue.trim()
-
-        useTopicsStore.setState({ data: newData })
+        closeHandler()
       }
-
-      closeHandler()
     } catch (error) {
       console.warn(error)
     } finally {
@@ -78,14 +69,40 @@ export const MergeTopicModal: FC<Props> = ({ topic, onClose }) => {
   }
 
   return (
-    <BaseModal id="mergeTopic" kind="regular" onClose={closeHandler} preventOutsideClose>
+    <BaseModal id="mergeTopic" kind="small" onClose={closeHandler} preventOutsideClose>
       <FormProvider {...form}>
-        <TitleEditor from={topic.name} onSelect={setSelectedTopic} selectedTopic={selectedTopic} />
-        <Button color="secondary" disabled={loading} onClick={handleSave} size="large" variant="contained">
+        <TitleEditor
+          from={multiTopics}
+          isSwapped={isSwapped}
+          onSelect={setSelectedToNode}
+          selectedToNode={selectedToNode}
+          setIsSwapped={() => setIsSwapped(!isSwapped)}
+        />
+        <CustomButton
+          color="secondary"
+          data-testid="merge-topics-button"
+          disabled={loading || !selectedToNode}
+          onClick={handleSave}
+          size="large"
+          variant="contained"
+        >
           Merge topics
-          {loading && <ClipLoader color={colors.BLUE_PRESS_STATE} size={10} />}
-        </Button>
+          {loading && (
+            <ClipLoaderWrapper>
+              <ClipLoader color={colors.lightGray} size={12} />
+            </ClipLoaderWrapper>
+          )}
+        </CustomButton>
       </FormProvider>
     </BaseModal>
   )
 }
+
+const CustomButton = styled(Button)`
+  width: 293px !important;
+  margin: 0 0 10px auto !important;
+`
+
+const ClipLoaderWrapper = styled.span`
+  margin-top: 2px;
+`

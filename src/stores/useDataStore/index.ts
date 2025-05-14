@@ -1,20 +1,34 @@
+import { isEqual } from 'lodash'
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import { nodesAreRelatives } from '~/components/Universe/constants'
-import { isChileGraph } from '~/constants'
 import { fetchGraphData } from '~/network/fetchGraphData'
-import { GraphData, Link, NodeExtended, NodeType, Sources, TStats, Trending } from '~/types'
-import { saveSearchTerm } from '~/utils/relayHelper/index'
+import { getNode as fetchNodeData } from '~/network/fetchSourcesData'
+import {
+  FetchDataResponse,
+  FetchNodeParams,
+  FilterParams,
+  Link,
+  Node,
+  NodeExtended,
+  NodeType,
+  Sources,
+  Trending,
+  TStats,
+} from '~/types'
+import { useAiSummaryStore } from '../useAiSummaryStore'
+import { useAppStore } from '../useAppStore'
+import { useUserStore } from '../useUserStore'
 
-export type GraphStyle = 'sphere' | 'force' | 'split' | 'earth'
-
-export const graphStyles: GraphStyle[] = ['sphere', 'force', 'split', 'earth']
-
-export type FetchNodeParams = {
-  word?: string
-  skip_cache?: string
-  free?: string
-  media_type?: string
+export const defaultFilters = {
+  skip: 0,
+  limit: 300,
+  depth: '2',
+  sort_by: 'score',
+  include_properties: 'true',
+  top_node_count: '50',
+  includeContent: 'true',
+  node_type: [],
+  search_method: 'hybrid',
 }
 
 export type SidebarFilterWithCount = {
@@ -24,58 +38,62 @@ export type SidebarFilterWithCount = {
 
 export type DataStore = {
   splashDataLoading: boolean
-  scrollEventsDisabled: boolean
+  abortRequest: boolean
   categoryFilter: NodeType | null
-  disableCameraRotation: boolean
-  graphRadius: number | null
-  data: { nodes: NodeExtended[]; links: Link[] } | null
-  selectionGraphData: GraphData
-  graphStyle: GraphStyle
+  dataInitial: { nodes: Node[]; links: Link[] } | null
+  dataNew: { nodes: Node[]; links: Link[] } | null
+  filters: FilterParams
   isFetching: boolean
-  hoveredNode: NodeExtended | null
-  selectedNode: NodeExtended | null
+  isLoadingNew: boolean
   selectedTimestamp: NodeExtended | null
   sources: Sources[] | null
   queuedSources: Sources[] | null
-  sphinxModalIsOpen: boolean
-  cameraFocusTrigger: boolean
-  selectedNodeRelativeIds: string[]
-  nearbyNodeIds: string[]
-  showSelectionGraph: boolean
-  showTeachMe: boolean
   hideNodeDetails: boolean
   sidebarFilter: string
   sidebarFilters: string[]
   sidebarFilterCounts: SidebarFilterWithCount[]
   trendingTopics: Trending[]
   stats: TStats | null
+  nodeTypes: string[]
+  linkTypes: string[]
+  seedQuestions: string[] | null
+  runningProjectId: string
+  runningProjectMessages: string[]
+  nodesNormalized: Map<string, NodeExtended>
+  linksNormalized: Map<string, Link>
 
   setTrendingTopics: (trendingTopics: Trending[]) => void
+  resetDataNew: () => void
   setStats: (stats: TStats) => void
   setSidebarFilter: (filter: string) => void
-  setScrollEventsDisabled: (scrollEventsDisabled: boolean) => void
   setCategoryFilter: (categoryFilter: NodeType | null) => void
-  setDisableCameraRotation: (rotation: boolean) => void
-  fetchData: (setBudget: (value: number | null) => void, params?: FetchNodeParams) => void
-  setData: (data: GraphData) => void
-  setGraphStyle: (graphStyle: GraphStyle) => void
-  setGraphRadius: (graphRadius?: number | null) => void
-  setHoveredNode: (hoveredNode: NodeExtended | null) => void
-  setSelectedNode: (selectedNode: NodeExtended | null) => void
+  fetchData: (
+    setBudget: (value: number | null) => void,
+    setAbortRequests: (status: boolean) => void,
+    AISearchQuery?: string,
+    params?: FetchNodeParams,
+  ) => void
   setSelectedTimestamp: (selectedTimestamp: NodeExtended | null) => void
   setSources: (sources: Sources[] | null) => void
   setQueuedSources: (sources: Sources[] | null) => void
-  setSphinxModalOpen: (_: boolean) => void
-  setCameraFocusTrigger: (_: boolean) => void
   setIsFetching: (_: boolean) => void
-  setNearbyNodeIds: (_: string[]) => void
-  setShowSelectionGraph: (_: boolean) => void
-  setSelectionData: (data: GraphData) => void
+  setRunningProjectId: (runningProjectId: string) => void
+  setRunningProjectMessages: (message: string) => void
+  resetRunningProjectMessages: () => void
   setHideNodeDetails: (_: boolean) => void
-  setTeachMe: (_: boolean) => void
-  addNewNode: (node: NodeExtended) => void
+  addNewNode: (data: FetchDataResponse) => void
+  updateNode: (updatedNode: NodeExtended) => void
   removeNode: (id: string) => void
   setSidebarFilterCounts: (filterCounts: SidebarFilterWithCount[]) => void
+  setAbortRequests: (abortRequest: boolean) => void
+  nextPage: () => void
+  setFilters: (filters: Partial<FilterParams>) => void
+  setSeedQuestions: (questions: string[]) => void
+  abortFetchData: () => void
+  resetGraph: () => void
+  resetData: () => void
+  finishLoading: () => void
+  getNode: (refId: string) => Promise<NodeExtended | null>
 }
 
 const defaultData: Omit<
@@ -84,178 +102,334 @@ const defaultData: Omit<
   | 'setStats'
   | 'setSidebarFilter'
   | 'fetchData'
+  | 'setFilters'
   | 'setIsFetching'
-  | 'setData'
-  | 'setCameraAnimation'
-  | 'setScrollEventsDisabled'
   | 'setCategoryFilter'
-  | 'setDisableCameraRotation'
   | 'setHoveredNode'
-  | 'setSelectedNode'
   | 'setSelectedTimestamp'
   | 'setSphinxModalOpen'
-  | 'setCameraFocusTrigger'
   | 'setSources'
   | 'setSidebarFilterCounts'
   | 'setQueuedSources'
-  | 'setGraphRadius'
-  | 'setGraphStyle'
-  | 'setNearbyNodeIds'
-  | 'setShowSelectionGraph'
-  | 'setSelectionData'
   | 'setHideNodeDetails'
-  | 'setTeachMe'
   | 'addNewNode'
+  | 'updateNode'
   | 'removeNode'
+  | 'setAbortRequests'
+  | 'nextPage'
+  | 'resetDataNew'
+  | 'setSeedQuestions'
+  | 'setRunningProjectId'
+  | 'setRunningProjectMessages'
+  | 'resetRunningProjectMessages'
+  | 'abortFetchData'
+  | 'resetGraph'
+  | 'resetData'
+  | 'finishLoading'
+  | 'getNode'
 > = {
   categoryFilter: null,
-  data: null,
-  selectionGraphData: { nodes: [], links: [] },
-  scrollEventsDisabled: false,
-  disableCameraRotation: false,
-  graphRadius: isChileGraph ? 1600 : 3056, // calculated from initial load
-  graphStyle: (localStorage.getItem('graphStyle') as GraphStyle) || 'sphere',
+  dataInitial: null,
+  runningProjectMessages: [],
+  filters: defaultFilters,
   isFetching: false,
+  isLoadingNew: false,
   queuedSources: null,
-  hoveredNode: null,
-  selectedNode: null,
   selectedTimestamp: null,
   sources: null,
-  sphinxModalIsOpen: false,
-  cameraFocusTrigger: false,
-  selectedNodeRelativeIds: [],
-  nearbyNodeIds: [],
-  showSelectionGraph: false,
-  showTeachMe: false,
-  hideNodeDetails: false,
   sidebarFilter: 'all',
   sidebarFilters: [],
   trendingTopics: [],
   sidebarFilterCounts: [],
   stats: null,
   splashDataLoading: true,
+  abortRequest: false,
+  dataNew: null,
+  seedQuestions: null,
+  runningProjectId: '',
+  hideNodeDetails: false,
+  nodeTypes: [],
+  linkTypes: [],
+  nodesNormalized: new Map<string, NodeExtended>(),
+  linksNormalized: new Map<string, Link>(),
 }
+
+let abortController: AbortController | null = null
 
 export const useDataStore = create<DataStore>()(
   devtools((set, get) => ({
     ...defaultData,
-    fetchData: async (setBudget, params) => {
-      if (get().isFetching) {
+
+    fetchData: async (setBudget, setAbortRequests, AISearchQuery = '') => {
+      const { filters, addNewNode, finishLoading } = get()
+      const currentPage = filters.skip
+      const itemsPerPage = filters.limit
+      const { currentSearch } = useAppStore.getState()
+      const { setNewLoading, aiRefId } = useAiSummaryStore.getState()
+
+      const ai = { ai_summary: String(!!AISearchQuery) }
+
+      if (!AISearchQuery) {
+        set(currentPage === 0 ? { isFetching: true } : { isLoadingNew: true })
+      }
+
+      if (AISearchQuery) {
+        setNewLoading({ question: AISearchQuery, answerLoading: true })
+      }
+
+      if (abortController) {
+        abortController.abort('abort')
+      }
+
+      const controller = new AbortController()
+      const { signal } = controller
+
+      abortController = controller
+
+      const { node_type: filterNodeTypes, ...withoutNodeType } = filters
+      const word = AISearchQuery || currentSearch
+
+      const isLatest = isEqual(filters, defaultData.filters) && !word
+
+      const updatedParams = {
+        ...withoutNodeType,
+        ...ai,
+        skip: currentPage === 0 ? String(currentPage * itemsPerPage) : String(currentPage * itemsPerPage + 1),
+        limit: word ? '25' : String(itemsPerPage),
+        ...(filterNodeTypes.length > 0 ? { node_type: JSON.stringify(filterNodeTypes) } : {}),
+        ...(word ? { word } : {}),
+        ...(aiRefId && AISearchQuery ? { previous_search_ref_id: aiRefId } : {}),
+        ...(!word && !AISearchQuery ? { sort_by: 'date_added_to_graph' } : {}),
+      }
+
+      try {
+        const data = await fetchGraphData(setBudget, updatedParams, isLatest, signal, setAbortRequests)
+
+        if (data?.nodes) {
+          addNewNode(data)
+        }
+
+        finishLoading()
+      } catch (error) {
+        console.error(error)
+
+        if (error !== 'abort') {
+          set({ isFetching: false, isLoadingNew: false })
+        }
+      }
+    },
+
+    finishLoading: () => {
+      set({ isFetching: false, isLoadingNew: false, splashDataLoading: false })
+    },
+
+    addNewNode: (data) => {
+      const { dataInitial: existingData, nodesNormalized, linksNormalized } = get()
+
+      if (!data?.nodes) {
         return
       }
 
-      set({ isFetching: true, sphinxModalIsOpen: true })
+      // Initialize maps if not already present
+      const normalizedNodesMap = nodesNormalized || new Map()
+      const normalizedLinksMap = linksNormalized || new Map()
 
-      const data = await fetchGraphData(get().graphStyle, setBudget, params ?? {})
+      // Filter nodes based on filters.node_type
+      const nodesFilteredByFilters = data.nodes
 
-      if (params?.word) {
-        await saveSearchTerm()
-      }
+      // Add new nodes directly to the Map
+      const newNodes: Node[] = []
 
-      const sidebarFilters = ['all', ...new Set(data.nodes.map((i) => i.node_type || 'Other'))]
+      nodesFilteredByFilters.forEach((node) => {
+        if (!normalizedNodesMap.has(node.ref_id)) {
+          normalizedNodesMap.set(node.ref_id, { ...node, sources: [], targets: [] })
+          newNodes.push(node)
+        }
+      })
+
+      // Get existing nodes and add new nodes
+      const currentNodes = existingData?.nodes || []
+      const updatedNodes = [...currentNodes, ...newNodes]
+
+      // Filter and add new links
+      const newLinks: Link[] = []
+
+      const edges = data.edges || []
+
+      edges.forEach((link: Link) => {
+        if (
+          !normalizedLinksMap.has(link.ref_id) && // Ensure link is unique
+          normalizedNodesMap.has(link.source) && // Ensure source node exists
+          normalizedNodesMap.has(link.target) // Ensure target node exists
+        ) {
+          normalizedLinksMap.set(link.ref_id, link)
+          newLinks.push(link)
+
+          // Update sources and targets for the respective nodes
+          const sourceNode = normalizedNodesMap.get(link.source)
+          const targetNode = normalizedNodesMap.get(link.target)
+
+          if (sourceNode && targetNode) {
+            if (sourceNode.targets) {
+              sourceNode.targets.push(link.target)
+            } else {
+              sourceNode.targets = [link.target]
+            }
+
+            if (targetNode.sources) {
+              targetNode.sources.push(link.source)
+            } else {
+              targetNode.sources = [link.source]
+            }
+
+            sourceNode.edgeTypes = [...new Set([...(sourceNode.edgeTypes || []), link.edge_type])]
+            targetNode.edgeTypes = [...new Set([...(targetNode.edgeTypes || []), link.edge_type])]
+          }
+        }
+      })
+
+      // Get existing links and add new links
+      const currentLinks = existingData?.links || []
+      const updatedLinks = [...currentLinks, ...newLinks]
+
+      // Update node types and sidebar filters
+      const nodeTypes = [...new Set(updatedNodes.map((node) => node.node_type))]
+      const linkTypes = [...new Set(updatedLinks.map((node) => node.edge_type))]
+      const sidebarFilters = ['all', ...nodeTypes.map((type) => type.toLowerCase())]
 
       const sidebarFilterCounts = sidebarFilters.map((filter) => ({
         name: filter,
-        count: data.nodes.filter(
-          (node) => filter === 'all' || node.node_type === filter || (!node.node_type && filter === 'Other'),
-        ).length,
+        count: updatedNodes.filter((node) => filter === 'all' || node.node_type?.toLowerCase() === filter).length,
       }))
 
+      if (!newNodes.length && !newLinks.length) {
+        return
+      }
+
+      // Persist updates
       set({
-        data,
-        isFetching: false,
-        sphinxModalIsOpen: false,
-        disableCameraRotation: false,
-        nearbyNodeIds: [],
-        selectedNodeRelativeIds: [],
-        showSelectionGraph: false,
-        showTeachMe: false,
+        dataInitial: { nodes: updatedNodes, links: updatedLinks },
+        dataNew: { nodes: newNodes, links: newLinks },
+        nodeTypes,
+        linkTypes,
         sidebarFilters,
         sidebarFilterCounts,
+        nodesNormalized: normalizedNodesMap,
+        linksNormalized: normalizedLinksMap,
       })
+    },
+
+    abortFetchData: () => {
+      if (abortController) {
+        abortController.abort('abort')
+      }
+    },
+    resetGraph: () => {
+      const { setAbortRequests } = get()
+      const { setBudget } = useUserStore.getState()
+
+      set({
+        filters: defaultData.filters,
+        dataInitial: null,
+        dataNew: null,
+      })
+
+      get().fetchData(setBudget, setAbortRequests)
+    },
+
+    resetData: () => {
+      set({
+        dataInitial: null,
+        sidebarFilter: 'all',
+        sidebarFilters: [],
+        sidebarFilterCounts: [],
+        dataNew: null,
+        runningProjectId: '',
+        nodeTypes: [],
+        nodesNormalized: new Map<string, NodeExtended>(),
+        linksNormalized: new Map<string, Link>(),
+      })
+    },
+
+    nextPage: () => {
+      const { filters, fetchData, setAbortRequests } = get()
+      const { setBudget } = useUserStore.getState()
+
+      set({ filters: { ...filters, skip: filters.skip + 1 } })
+      fetchData(setBudget, setAbortRequests)
+    },
+    resetDataNew: () => set({ dataNew: null }),
+    setFilters: (filters: Partial<FilterParams>) => {
+      const { setBudget } = useUserStore.getState()
+
+      set((state) => ({ filters: { ...state.filters, ...filters, skip: 0 } }))
+      get().fetchData(setBudget, get().setAbortRequests)
     },
     setSidebarFilterCounts: (sidebarFilterCounts) => set({ sidebarFilterCounts }),
     setTrendingTopics: (trendingTopics) => set({ trendingTopics }),
     setStats: (stats) => set({ stats }),
     setIsFetching: (isFetching) => set({ isFetching }),
-    setData: (data) => set({ data }),
-    setSelectionData: (selectionGraphData) => set({ selectionGraphData }),
-    setScrollEventsDisabled: (scrollEventsDisabled) => set({ scrollEventsDisabled }),
+
     setCategoryFilter: (categoryFilter) => set({ categoryFilter }),
-    setDisableCameraRotation: (rotation) => set({ disableCameraRotation: rotation }),
-    setGraphRadius: (graphRadius) => set({ graphRadius }),
-    setGraphStyle: (graphStyle) => set({ graphStyle }),
     setQueuedSources: (queuedSources) => set({ queuedSources }),
-    setHoveredNode: (hoveredNode) => set({ hoveredNode }),
-    setSelectedNode: (selectedNode) => {
-      const stateSelectedNode = get().selectedNode
-
-      if (stateSelectedNode?.ref_id !== selectedNode?.ref_id) {
-        const { data } = get()
-
-        const relativeIds =
-          data?.nodes.filter((f) => f.ref_id && nodesAreRelatives(f, selectedNode)).map((n) => n?.ref_id || '') || []
-
-        set({
-          hoveredNode: null,
-          selectedNode,
-          disableCameraRotation: true,
-          selectedNodeRelativeIds: relativeIds,
-        })
-      }
-    },
     setSidebarFilter: (sidebarFilter: string) => set({ sidebarFilter }),
     setSelectedTimestamp: (selectedTimestamp) => set({ selectedTimestamp }),
     setSources: (sources) => set({ sources }),
-    setSphinxModalOpen: (sphinxModalIsOpen) => set({ sphinxModalIsOpen }),
-    setCameraFocusTrigger: (cameraFocusTrigger) => set({ cameraFocusTrigger }),
-    setNearbyNodeIds: (nearbyNodeIds) => {
-      const stateNearbyNodeIds = get().nearbyNodeIds
-
-      if (nearbyNodeIds.length !== stateNearbyNodeIds.length || nearbyNodeIds[0] !== stateNearbyNodeIds[0]) {
-        set({ nearbyNodeIds })
-      }
-    },
-    setShowSelectionGraph: (showSelectionGraph) => set({ showSelectionGraph }),
     setHideNodeDetails: (hideNodeDetails) => set({ hideNodeDetails }),
-    setTeachMe: (showTeachMe) => set({ showTeachMe }),
-    addNewNode: (node) => {
-      const { data } = get()
+    setSeedQuestions: (questions) => set({ seedQuestions: questions }),
+    updateNode: (updatedNode) => {
+      const { nodesNormalized } = get()
 
-      if (!data) {
-        return
-      }
+      const newNodesNormalized = new Map(nodesNormalized)
 
-      const newData = { ...data, nodes: [node, ...data.nodes] }
+      newNodesNormalized.set(updatedNode.ref_id, updatedNode)
 
-      set({ data: newData })
+      set({ nodesNormalized: newNodesNormalized })
     },
+
     removeNode: (id) => {
-      const { data } = get()
+      console.log(id)
+    },
 
-      if (!data) {
-        return
+    setRunningProjectId: (runningProjectId) => set({ runningProjectId, runningProjectMessages: [] }),
+    setRunningProjectMessages: (message) => {
+      const { runningProjectMessages } = get()
+
+      set({ runningProjectMessages: [...runningProjectMessages, message] })
+    },
+    resetRunningProjectMessages: () => set({ runningProjectMessages: [] }),
+    setAbortRequests: (abortRequest) => set({ abortRequest }),
+    getNode: async (refId: string) => {
+      try {
+        const response = await fetchNodeData(refId)
+
+        return response
+      } catch (error) {
+        console.error(`Failed to fetch node data for ref_id ${refId}:`, error)
+
+        return null
       }
-
-      const removeData = {
-        ...data,
-        nodes: data.nodes.filter((el) => el.ref_id !== id && el.id !== id && el.id !== id && el.ref_id !== id),
-      }
-
-      set({ data: removeData })
     },
   })),
 )
 
-export const useSelectedNode = () => useDataStore((s) => s.selectedNode)
-
 export const useFilteredNodes = () =>
   useDataStore((s) => {
     if (s.sidebarFilter === 'all') {
-      return s.data?.nodes || []
+      return s.dataInitial?.nodes || []
     }
 
-    return (s.data?.nodes || []).filter((i) =>
-      s.sidebarFilter === 'Other' ? !i.node_type : i.node_type === s.sidebarFilter,
-    )
+    return (s.dataInitial?.nodes || []).filter((i) => i.node_type?.toLowerCase() === s.sidebarFilter.toLowerCase())
   })
+
+export const useNodeTypes = () => useDataStore((s) => s.nodeTypes)
+
+export const useNormalizedNode = (refId: string) => {
+  const nodesNormalized = useDataStore((s) => s.nodesNormalized)
+
+  if (refId) {
+    return nodesNormalized.get(refId)
+  }
+
+  return null
+}

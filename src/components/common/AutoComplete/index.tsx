@@ -1,4 +1,4 @@
-import { CircularProgress } from '@mui/material'
+import { CircularProgress, Popper } from '@mui/material'
 import Autocomplete from '@mui/material/Autocomplete'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
@@ -6,6 +6,7 @@ import { ChangeEvent, FC, SyntheticEvent, useEffect, useRef, useState } from 're
 import styled from 'styled-components'
 import { colors } from '~/utils'
 import { Flex } from '../Flex'
+import { TypeBadge } from '../TypeBadge'
 
 export type TAutocompleteOption = {
   label: string
@@ -22,6 +23,10 @@ type Props = {
   isLoading?: boolean
   autoFocus?: boolean
   disabled?: boolean
+  dataTestId?: string
+  dataId?: string
+  placeholder?: string
+  className?: string
 }
 
 const defaultProps = {
@@ -38,6 +43,10 @@ export const AutoComplete: FC<Props> = ({
   isLoading = false,
   autoFocus = false,
   disabled = false,
+  dataTestId,
+  dataId,
+  placeholder,
+  className,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState<boolean>(false)
@@ -60,6 +69,8 @@ export const AutoComplete: FC<Props> = ({
         autoFocus
         autoHighlight
         blurOnSelect
+        className={className}
+        data-testid={dataId}
         disableClearable
         disabled={disabled}
         disablePortal
@@ -76,6 +87,7 @@ export const AutoComplete: FC<Props> = ({
               borderRadius: '6px',
             },
           },
+          ref: inputRef,
         }}
         loading={isLoading}
         onChange={handleChange}
@@ -84,10 +96,16 @@ export const AutoComplete: FC<Props> = ({
         onOpen={() => setOpen(true)}
         open={open}
         options={options ?? []}
+        PopperComponent={({ children, ...popperProps }) => (
+          <Popper {...popperProps} placement="bottom-start">
+            {children}
+          </Popper>
+        )}
         renderInput={(params) => (
           <StyledInput
             inputRef={inputRef}
             {...params}
+            data-testid={dataTestId}
             InputProps={{
               ...params.InputProps,
               disableUnderline: true,
@@ -95,14 +113,28 @@ export const AutoComplete: FC<Props> = ({
                 <>{isLoading ? <CircularProgress color="inherit" size={20} /> : params.InputProps.endAdornment}</>
               ),
             }}
+            placeholder={placeholder}
             size="medium"
             variant="standard"
           />
         )}
         renderOption={(props, option) => (
           <li {...props}>
-            <Flex align="center" direction="row" grow={1} justify="space-between" onClick={option?.action} shrink={1}>
+            <Flex
+              align="center"
+              data-testid={option.label}
+              direction="row"
+              grow={1}
+              justify="space-between"
+              onClick={option?.action}
+              shrink={1}
+              style={{
+                fontSize: '14px',
+                wordBreak: 'break-word',
+              }}
+            >
               <div className="option">{option.label !== '' ? option.label : 'Not Selected'}</div>
+              {option?.type && <TypeBadge type={option.type} />}
             </Flex>
           </li>
         )}

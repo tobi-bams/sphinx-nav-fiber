@@ -1,8 +1,8 @@
 export const fontProps = {
-  font: '/fonts/Inter-Bold.woff',
-  characters: 'abcdefghijklmnopqrstuvwxyz0123456789!',
-  fontSize: 2,
-  letterSpacing: -0.05,
+  font: '/fonts/Barlow-SemiBold.ttf',
+  characters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!',
+  fontSize: 1,
+  letterSpacing: 0,
   lineHeight: 1,
   'material-toneMapped': false,
 }

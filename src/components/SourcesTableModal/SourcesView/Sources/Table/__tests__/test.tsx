@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { TWITTER_LINK, sourcesMapper } from '~/components/SourcesTableModal/SourcesView/constants'
 import { RSS, TWITTER_HANDLE, YOUTUBE_CHANNEL } from '~/constants'
@@ -11,6 +11,10 @@ describe('Table Component Tests', () => {
     { ref_id: '2', source: '@danielprince1038', source_type: YOUTUBE_CHANNEL },
     { ref_id: '3', source: 'https://anchor.fm/s/71a8cc78/podcast/rss', source_type: RSS },
   ]
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
 
   it('should correctly render links for each source type', () => {
     render(<Table canEdit={false} data={mockData} />)
@@ -54,5 +58,43 @@ describe('Table Component Tests', () => {
 
     expect(sourceTypeCell).toBeInTheDocument()
     expect(sourceCell).toBeInTheDocument()
+  })
+
+  it('should display loader when clicking on delete icon', async () => {
+    const isEdit = true
+
+    render(<Table canEdit={isEdit} data={mockData} />)
+
+    const deleteIcon = screen.getByTestId('delete-icon-2')
+
+    fireEvent.click(deleteIcon)
+
+    const confirmDelete = await screen.findByText('Yes')
+
+    fireEvent.click(confirmDelete)
+
+    const loader = await screen.findByTestId('delete-loader-2')
+
+    expect(loader).toBeInTheDocument()
+  })
+
+  it('should display loader when clicking on edit icon and then check icon', async () => {
+    const isEdit = true
+
+    render(<Table canEdit={isEdit} data={mockData} />)
+
+    waitFor(() => {
+      const editIcon = screen.getByTestId('edit-icon-1')
+
+      fireEvent.click(editIcon)
+
+      const checkIcon = screen.getByTestId('check-icon-1')
+
+      fireEvent.click(checkIcon)
+
+      const loader = screen.findByTestId('edit-loader-1')
+
+      expect(loader).toBeInTheDocument()
+    })
   })
 })

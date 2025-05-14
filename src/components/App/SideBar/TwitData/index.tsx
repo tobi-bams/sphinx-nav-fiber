@@ -9,13 +9,15 @@ import { Divider } from '~/components/common/Divider'
 import { Flex } from '~/components/common/Flex'
 import { highlightSearchTerm } from '~/components/common/Highlight/Highlight'
 import { useAppStore } from '~/stores/useAppStore'
-import { useSelectedNode } from '~/stores/useDataStore'
+import { useSelectedNode } from '~/stores/useGraphStore'
 import { colors } from '~/utils/colors'
 import { BoostAmt } from '../../Helper/BoostAmt'
 import { Date } from '../Relevance/Episode'
+import { adaptTweetNode } from '~/utils/twitterAdapter'
 
 export const TwitData = () => {
   const selectedNode = useSelectedNode()
+  const adaptedNode = selectedNode ? adaptTweetNode(selectedNode) : null
 
   const {
     date,
@@ -26,15 +28,15 @@ export const TwitData = () => {
     image_url: profilePicture,
     twitter_handle: twitterHandle,
     ref_id: refId,
-  } = selectedNode || {}
+  } = adaptedNode || {}
 
-  const twitId: string = selectedNode?.tweet_id || ''
+  const twitId: string = adaptedNode?.tweet_id || ''
   const [boostAmount, setBoostAmount] = useState<number>(boost || 0)
 
   const searchTerm = useAppStore((s) => s.currentSearch)
 
   return (
-    selectedNode && (
+    adaptedNode && (
       <>
         <Flex direction="column" p={24}>
           <Flex align="center" direction="row" pr={16}>
@@ -61,23 +63,19 @@ export const TwitData = () => {
             </Flex>
           </Flex>
           <Flex align="stretch" mt={22}>
-            <StyledButton
-              endIcon={<LinkIcon />}
-              onClick={() =>
-                window.open(
-                  `https://twitter.com/Interior/status/${twitId}${twitId.includes('?') ? '&' : '?'}open=system`,
-                  '_blank',
-                )
-              }
+            <a
+              href={`https://twitter.com/${twitterHandle}/status/${twitId}?open=system`}
+              rel="noopener noreferrer"
+              target="_blank"
             >
-              View Tweet
-            </StyledButton>
+              <StyledButton endIcon={<LinkIcon />}>View Tweet</StyledButton>
+            </a>
           </Flex>
         </Flex>
         <StyledDivider />
         <Flex direction="row" justify="space-between" pt={14} px={24}>
           <BoostAmt amt={boostAmount} />
-          <Booster content={selectedNode} count={boostAmount} refId={refId} updateCount={setBoostAmount} />
+          <Booster content={adaptedNode} count={boostAmount} refId={refId} updateCount={setBoostAmount} />
         </Flex>
       </>
     )
@@ -126,7 +124,6 @@ const TwitText = styled(Flex)`
   letter-spacing: -0.39px;
   margin: 8px 0;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: normal;

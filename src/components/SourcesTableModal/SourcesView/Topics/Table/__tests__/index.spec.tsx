@@ -1,10 +1,10 @@
 /* eslint-disable padding-line-between-statements */
-import React from 'react'
-import { render, fireEvent, waitFor, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { Table } from '../index'
-import { TopicTableProps } from '../../../types'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import React from 'react'
+import { TopicTableProps } from '../../../types'
+import { Table } from '../index'
 
 const mockData = {
   '1': {
@@ -13,7 +13,7 @@ const mockData = {
     edgeCount: 5,
     edgeList: ['Edge1', 'Edge2'],
     date_added_to_graph: '1616161616',
-    muted_topic: false,
+    is_muted: false,
   },
   '2': {
     ref_id: '2',
@@ -21,7 +21,7 @@ const mockData = {
     edgeCount: 3,
     edgeList: ['Edge3', 'Edge4'],
     date_added_to_graph: '1616161617',
-    muted_topic: true,
+    is_muted: true,
   },
 }
 
@@ -127,5 +127,58 @@ describe('Table Component', () => {
       userEvent.click(addEdgeOption)
       expect(mockOnTopicEdit).toHaveBeenCalledWith(expect.any(String), 'addEdge')
     })
+  })
+
+  test('visibility and three dots icons are disabled when more than one value is selected', async () => {
+    const { getByTestId } = renderTable()
+
+    waitFor(async () => {
+      // Simulate selecting more than one value
+      mockSetCheckedStates.mockImplementation(() => ({ '1': true, '2': true }))
+
+      await screen.findAllByTestId('ThreeDotsIcons')
+      fireEvent.click(getByTestId('ThreeDotsIcons'))
+
+      expect(getByTestId('ThreeDotsIcons')).toBeDisabled()
+      expect(getByTestId('VisibilityOff')).toBeDisabled()
+    })
+  })
+})
+
+test('Save Changes button should be diable without any change and without any text', async () => {
+  const { getByTestId } = renderTable()
+
+  waitFor(async () => {
+    fireEvent.click(getByTestId('ThreeDotsIcons'))
+
+    const renameOption = await screen.findByText(/Rename/i)
+
+    userEvent.click(renameOption)
+
+    const saveButtonBeforeChange = screen.getByRole('button', { name: 'Save Changes' })
+
+    expect(saveButtonBeforeChange).toBeDisabled()
+
+    const inputField = screen.getByPlaceholderText('Add your topic')
+    userEvent.type(inputField, 'Test topic')
+
+    const saveButton = screen.getByRole('button', { name: 'Save Changes' })
+    expect(saveButton).toBeEnabled()
+
+    fireEvent.change(inputField, { target: { value: '' } })
+
+    expect(saveButton).toBeDisabled()
+  })
+})
+
+test('When check a topic then Merge Topics should be display', async () => {
+  const { getByTestId, getByText } = renderTable()
+
+  waitFor(async () => {
+    fireEvent.click(getByTestId('topic-check-box'))
+
+    const mergeButton = getByText(/ Merge/i)
+
+    expect(mergeButton).toBeInTheDocument()
   })
 })

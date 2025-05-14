@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
+import { useGraphData } from '~/components/DataRetriever'
+import { useNodeNavigation } from '~/components/Universe/useNodeNavigation'
 import { Avatar } from '~/components/common/Avatar'
 import { Flex } from '~/components/common/Flex'
 import { Text } from '~/components/common/Text'
 import { TypeBadge } from '~/components/common/TypeBadge'
-import { useGraphData } from '~/components/DataRetriever'
-import { useDataStore } from '~/stores/useDataStore'
+import { useSelectedNode } from '~/stores/useGraphStore'
 import { NodeExtended } from '~/types'
 import { getSelectedNodeTimestamps } from '~/utils'
 import { colors } from '~/utils/colors'
@@ -42,7 +43,7 @@ const Header = styled(Flex)`
 `
 
 const EpisodeHeaderText = styled(Text)`
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   max-width: 250px;
   -webkit-box-orient: vertical;
@@ -52,6 +53,7 @@ const EpisodeHeaderText = styled(Text)`
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  margin-bottom: 26px;
 `
 
 const ScrollableList = styled.div`
@@ -60,7 +62,8 @@ const ScrollableList = styled.div`
 `
 
 export const Show = () => {
-  const [selectedNode, setSelectedNode] = useDataStore((s) => [s.selectedNode, s.setSelectedNode])
+  const selectedNode = useSelectedNode()
+  const { navigateToNode } = useNodeNavigation()
   const data = useGraphData()
   const [showHost, setShowHost] = useState<string[]>([])
 
@@ -71,7 +74,7 @@ export const Show = () => {
     if (selectedNode?.children?.length) {
       selectedNode.children.forEach((childRefId, index) => {
         const timeStamp = getSelectedNodeTimestamps(data?.nodes || [], selectedNode) || []
-        const childNode = data?.nodes.find((f) => f.ref_id === childRefId)
+        const childNode = data?.nodes.find((f: NodeExtended) => f.ref_id === childRefId)
 
         if (childNode) {
           childNode.timestamp = timeStamp[0]?.timestamp
@@ -107,14 +110,12 @@ export const Show = () => {
           </Flex>
           <Flex direction="column">
             <Flex direction="column" grow={1} justify="space-between">
-              <Flex align="center" direction="row" justify="flex-start" mb={16}>
+              <Flex align="center" direction="row" justify="flex-start">
                 <TypeBadge type="show" />{' '}
                 <div className="subtitle">by {showHost.join(', ') || selectedNode?.show_title}</div>
               </Flex>
 
-              <EpisodeHeaderText kind="bigHeading" title={selectedNode?.show_title || 'Unknown'}>
-                {selectedNode?.show_title || 'Unknown'}
-              </EpisodeHeaderText>
+              <EpisodeHeaderText kind="bigHeading">{selectedNode?.show_title || 'Unknown'}</EpisodeHeaderText>
             </Flex>
           </Flex>
         </Flex>
@@ -128,7 +129,7 @@ export const Show = () => {
         </Flex>
         <ScrollableList>
           {episodes.map((node) => (
-            <EpisodePanel key={node.ref_id} node={node} onClick={() => setSelectedNode(node)} />
+            <EpisodePanel key={node.ref_id} node={node} onClick={() => navigateToNode(node.ref_id)} />
           ))}
         </ScrollableList>
       </Flex>

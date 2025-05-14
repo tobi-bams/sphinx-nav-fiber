@@ -19,7 +19,7 @@ import { useAppStore } from '~/stores/useAppStore'
 import { useModal } from '~/stores/useModalStore'
 import { useTopicsStore } from '~/stores/useTopicsStore'
 import { colors } from '~/utils/colors'
-import { StyledTableCell, StyledTableHead } from '../../common'
+import { ActionStyledTableHead, StyledTableCell, StyledTableHead } from '../../common'
 import { TopicTableProps } from '../../types'
 import { TopicRow } from './TableRow'
 
@@ -30,13 +30,14 @@ interface CheckboxIconProps {
 export const Table: React.FC<TopicTableProps> = ({
   setShowMuteUnmute,
   showMuted,
+  loading,
   onTopicEdit,
   onChangeFilter,
   checkedStates,
   setCheckedStates,
 }) => {
   const { close } = useModal('sourcesTable')
-  const [loading, setLoading] = useState(false)
+  const [muteLoading, setMuteLoading] = useState(false)
   const [anchorEl, setAnchorEl] = React.useState<HTMLButtonElement | null>(null)
   const [selectedRefId, setSelectedRefId] = React.useState<string>('')
 
@@ -74,164 +75,184 @@ export const Table: React.FC<TopicTableProps> = ({
   const id = open ? 'simple-popover' : undefined
 
   const handleSelectedMuteUnmute = async () => {
-    setLoading(true)
-
-    const promises: Promise<unknown>[] = []
+    setMuteLoading(true)
 
     try {
-      Object.keys(checkedStates).forEach((index) => {
-        const value = checkedStates[index]
+      const promises = Object.keys(checkedStates).map(async (checkedId) => {
+        const value = checkedStates[checkedId]
 
         if (value) {
-          const promise = putNodeData(index, { muted_topic: showMuted })
+          try {
+            await putNodeData(checkedId, { node_data: { is_muted: !showMuted } })
 
-          useTopicsStore.setState({
-            ids: ids.filter((i) => i !== index),
-            total: total - 1,
-          })
+            return checkedId
+          } catch (error) {
+            // Handle specific error if needed
+            console.error('Error updating node data:', error)
 
-          promises.push(promise)
+            return null
+          }
         }
+
+        return null
       })
 
-      await Promise.all(promises)
+      const res = await Promise.all(promises)
 
-      setLoading(false)
+      useTopicsStore.setState({
+        ids: ids.filter((i) => !res.includes(i)),
+        total: total - res.length,
+      })
+
+      setCheckedStates({})
+
+      setMuteLoading(false)
     } catch (error) {
       console.error('Error:', error)
-      setLoading(false)
+      setMuteLoading(false)
     }
   }
 
-  return !data ? (
+  return !loading && !data ? (
     <Flex>
       <Text>There is not any results for selected filters</Text>
       <FilterOffIcon />
     </Flex>
   ) : (
     <>
-      {!Object.keys(data).length ? (
+      {data && !Object.keys(data).length ? (
         <Flex>
           <Text>There is not any results for selected filters</Text>
           <FilterOffIcon />
         </Flex>
       ) : (
-        <TableInnerWrapper align="center" justify={loading ? 'center' : 'flex-start'}>
-          {loading ? (
-            <ClipLoader color={colors.white} />
-          ) : (
-            <>
-              <MaterialTable component="table">
-                <StyledTableHead>
-                  <TableRow component="tr">
-                    <StyledTableCell className="empty" />
-                    <StyledTableCell>
-                      <SortedIcon onClick={() => handleChange(ALPHABETICALLY)}>
-                        Name <SortFilterIcon />
-                      </SortedIcon>
-                    </StyledTableCell>
-                    <StyledTableCell>Type</StyledTableCell>
-                    <StyledTableCell>
-                      <SortedIcon onClick={() => handleChange(EDGE_COUNT)}>
-                        Count <SortFilterIcon />
-                      </SortedIcon>
-                    </StyledTableCell>
-                    <StyledTableCell>Edge list</StyledTableCell>
-                    <StyledTableCell>
-                      <SortedIcon onClick={() => handleChange(DATE)}>
-                        Date <SortFilterIcon />
-                      </SortedIcon>
-                    </StyledTableCell>
-                    <StyledTableCell>
-                      <Flex px={8}>
-                        <CheckboxSection onClick={setShowMuteUnmute}>
-                          <CheckboxIcon checked={showMuted}>
-                            <Checkmark>{showMuted && <CheckIcon />}</Checkmark>
-                          </CheckboxIcon>
-                          Muted
-                        </CheckboxSection>
-                      </Flex>
-                    </StyledTableCell>
-                  </TableRow>
-                </StyledTableHead>
-                {checkedCount > 0 && (
-                  <TableRow component="tr">
-                    <StyledTableCell>
-                      <IconButton onClick={() => setCheckedStates({})}>
-                        <ClearIcon />
-                      </IconButton>
-                    </StyledTableCell>
-                    <StyledTableCell>
-                      <StatusBarSection>
-                        <CheckCountBoxSection>
-                          <CheckedCount>{checkedCount}</CheckedCount>
-                          selected
-                        </CheckCountBoxSection>
-                        <MuteStatusSection onClick={handleSelectedMuteUnmute} role="button">
-                          {showMuted ? (
-                            <>
-                              <VisibilityOn /> Unmute All
-                            </>
-                          ) : (
-                            <>
-                              <VisibilityOff /> Mute All
-                            </>
-                          )}
-                        </MuteStatusSection>
-                      </StatusBarSection>
-                    </StyledTableCell>
-                  </TableRow>
-                )}
+        <TableInnerWrapper align="center" justify={muteLoading ? 'center' : 'flex-start'}>
+          <MaterialTable component="table">
+            {checkedCount > 0 ? (
+              <ActionStyledTableHead>
+                <TableRow component="tr">
+                  <StyledTableCell>
+                    <IconButton onClick={() => setCheckedStates({})}>
+                      <ClearIcon />
+                    </IconButton>
+                  </StyledTableCell>
+                  <StyledTableCell colSpan={12}>
+                    <StatusBarSection>
+                      <CheckCountBoxSection>
+                        <CheckedCount>{checkedCount}</CheckedCount>
+                        selected
+                      </CheckCountBoxSection>
+                      <StyledTableCell className="empty" />
 
-                {data && (
-                  <tbody>
-                    {ids?.map((i: string) => (
-                      <TopicRow
-                        key={i}
-                        checkedStates={checkedStates}
-                        onClick={handleClick}
-                        onSearch={handleSearch}
-                        setCheckedStates={setCheckedStates}
-                        topic={data[i]}
-                      />
-                    ))}
-                  </tbody>
-                )}
-              </MaterialTable>
-              {selectedRefId ? (
-                <PopoverWrapper
-                  anchorEl={anchorEl}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  id={id}
-                  onClose={handleClose}
-                  open={open}
-                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                >
-                  {showMuted ? (
-                    <PopoverOption onClick={() => handlePopoverAction('unMute')}>
-                      {' '}
-                      <VisibilityOn data-testid="" /> Unmute
-                    </PopoverOption>
-                  ) : (
-                    <PopoverOption onClick={() => handlePopoverAction('mute')}>
-                      {' '}
-                      <VisibilityOff data-testid="VisibilityOff" /> Mute
-                    </PopoverOption>
-                  )}
-                  <PopoverOption onClick={() => handlePopoverAction('editTopic')}>
-                    <EditTopicIcon data-testid="EditTopicIcon" /> Rename
-                  </PopoverOption>
+                      <MuteStatusSection onClick={handleSelectedMuteUnmute} role="button">
+                        {showMuted ? (
+                          <>
+                            <VisibilityOn /> Unmute ALL
+                          </>
+                        ) : (
+                          <>
+                            <VisibilityOff /> Mute ALL
+                          </>
+                        )}
+                      </MuteStatusSection>
+                      <StyledTableCell className="empty" />
+                      <MuteStatusSection onClick={() => handlePopoverAction('mergeTopic')}>
+                        <MergeIcon /> Merge
+                      </MuteStatusSection>
+                    </StatusBarSection>
+                  </StyledTableCell>
+                  <StyledTableCell className="empty" />
+                </TableRow>
+              </ActionStyledTableHead>
+            ) : (
+              <StyledTableHead>
+                <TableRow component="tr">
+                  <StyledTableCell className="empty" />
+                  <StyledTableCell>
+                    <SortedIcon onClick={() => handleChange(ALPHABETICALLY)}>
+                      Name <SortFilterIcon />
+                    </SortedIcon>
+                  </StyledTableCell>
+                  <StyledTableCell>Type</StyledTableCell>
+                  <StyledTableCell>
+                    <SortedIcon onClick={() => handleChange(EDGE_COUNT)}>
+                      Count <SortFilterIcon />
+                    </SortedIcon>
+                  </StyledTableCell>
+                  <StyledTableCell>Edge list</StyledTableCell>
+                  <StyledTableCell>
+                    <SortedIcon onClick={() => handleChange(DATE)}>
+                      Date <SortFilterIcon />
+                    </SortedIcon>
+                  </StyledTableCell>
+                  <StyledTableCell>
+                    <Flex px={8}>
+                      <CheckboxSection onClick={setShowMuteUnmute}>
+                        <CheckboxIcon checked={showMuted}>
+                          <Checkmark>{showMuted && <CheckIcon />}</Checkmark>
+                        </CheckboxIcon>
+                        Muted
+                      </CheckboxSection>
+                    </Flex>
+                  </StyledTableCell>
+                </TableRow>
+              </StyledTableHead>
+            )}
 
-                  <PopoverOption onClick={() => handlePopoverAction('mergeTopic')}>
-                    <MergeIcon data-testid="MergeIcon" /> Merge
-                  </PopoverOption>
-                  <PopoverOption onClick={() => handlePopoverAction('addEdge')}>
-                    <AddCircleIcon data-testid="AddCircleIcon" /> Add edge
-                  </PopoverOption>
-                </PopoverWrapper>
-              ) : null}
-            </>
-          )}
+            {(loading || muteLoading) && !data && (
+              <ClipLoaderWrapper>
+                <ClipLoader color={colors.white} />
+              </ClipLoaderWrapper>
+            )}
+
+            {data && (
+              <tbody>
+                {ids?.map((i: string) => (
+                  <TopicRow
+                    key={i}
+                    checkedStates={checkedStates}
+                    isMuteDisabled={Object.values(checkedStates).filter((isChecked) => isChecked).length > 1}
+                    onClick={handleClick}
+                    onSearch={handleSearch}
+                    setCheckedStates={setCheckedStates}
+                    topic={data[i]}
+                  />
+                ))}
+              </tbody>
+            )}
+          </MaterialTable>
+          {selectedRefId ? (
+            <PopoverWrapper
+              anchorEl={anchorEl}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              id={id}
+              onClose={handleClose}
+              open={open}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              {showMuted ? (
+                <PopoverOption data-testid="unmute" onClick={() => handlePopoverAction('unMute')}>
+                  {' '}
+                  <VisibilityOn data-testid="" /> Unmute
+                </PopoverOption>
+              ) : (
+                <PopoverOption data-testid="mute" onClick={() => handlePopoverAction('mute')}>
+                  {' '}
+                  <VisibilityOff data-testid="VisibilityOff" /> Mute
+                </PopoverOption>
+              )}
+              <PopoverOption data-testid="rename" onClick={() => handlePopoverAction('editTopic')}>
+                <EditTopicIcon data-testid="EditTopicIcon" /> Rename
+              </PopoverOption>
+
+              <PopoverOption data-testid="merge" onClick={() => handlePopoverAction('mergeTopic')}>
+                <MergeIcon data-testid="MergeIcon" /> Merge
+              </PopoverOption>
+              <PopoverOption data-testid="add_edge" onClick={() => handlePopoverAction('addEdge')}>
+                <AddCircleIcon data-testid="AddCircleIcon" /> Add edge
+              </PopoverOption>
+            </PopoverWrapper>
+          ) : null}
         </TableInnerWrapper>
       )}
     </>
@@ -310,15 +331,18 @@ const CheckedCount = styled.span`
   font-family: Barlow;
   font-size: 13px;
   font-weight: 500;
-  margin-right: 3px;
+  margin-right: 4px;
+  margin-top: 1px;
 `
 
 const MuteStatusSection = styled.div`
   display: flex;
   align-items: center;
   cursor: pointer;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 1px 8px;
+  white-space: nowrap;
   &:hover {
     background-color: rgba(255, 255, 255, 0.2);
     padding: 1px 8px;
@@ -335,7 +359,7 @@ const CheckCountBoxSection = styled.div`
 const StatusBarSection = styled.span`
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 27px;
 `
 
 const TableInnerWrapper = styled(Flex)`
@@ -343,4 +367,16 @@ const TableInnerWrapper = styled(Flex)`
   overflow: auto;
   flex: 1;
   width: 100%;
+  position: relative;
+`
+
+const ClipLoaderWrapper = styled.div`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `

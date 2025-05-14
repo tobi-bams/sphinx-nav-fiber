@@ -1,13 +1,14 @@
 import { Button } from '@mui/material'
-import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
-import { ScrollView } from '~/components/ScrollView'
 import { Flex } from '~/components/common/Flex'
+import { useNodeNavigation } from '~/components/Universe/useNodeNavigation'
 import { useAppStore } from '~/stores/useAppStore'
 import { useDataStore, useFilteredNodes } from '~/stores/useDataStore'
 import { NodeExtended } from '~/types'
 import { formatDescription } from '~/utils/formatDescription'
 import { saveConsumedContent } from '~/utils/relayHelper'
+import { adaptTweetNode } from '~/utils/twitterAdapter'
 import { useIsMatchBreakpoint } from '~/utils/useIsMatchBreakpoint'
 import { Episode } from './Episode'
 
@@ -17,15 +18,15 @@ type Props = {
 
 // eslint-disable-next-line no-underscore-dangle
 const _Relevance = ({ isSearchResult }: Props) => {
-  const scrollViewRef = useRef<HTMLDivElement | null>(null)
-
   const pageSize = !isSearchResult ? 10 : 80
 
-  const { setSelectedNode, setSelectedTimestamp } = useDataStore((s) => s)
+  const { setSelectedTimestamp, nextPage } = useDataStore((s) => s)
+  const { navigateToNode } = useNodeNavigation()
 
   const { currentSearch, setSidebarOpen, setRelevanceSelected } = useAppStore((s) => s)
 
   const [currentPage, setCurrentPage] = useState(0)
+  const [buttonKey, setButtonKey] = useState(0)
 
   const filteredNodes = useFilteredNodes()
 
@@ -41,11 +42,20 @@ const _Relevance = ({ isSearchResult }: Props) => {
       saveConsumedContent(node)
       setSelectedTimestamp(node)
       setRelevanceSelected(true)
-      setSelectedNode(node)
+      navigateToNode(node.ref_id)
       isMobile && setSidebarOpen(false)
     },
-    [setSelectedNode, setRelevanceSelected, setSidebarOpen, setSelectedTimestamp, isMobile],
+    [setSelectedTimestamp, setRelevanceSelected, navigateToNode, isMobile, setSidebarOpen],
   )
+
+  const handleLoadMoreClick = () => {
+    nextPage()
+
+    if (hasNext) {
+      setCurrentPage(currentPage + 1)
+      setButtonKey((prevKey) => prevKey + 1)
+    }
+  }
 
   const currentNodes = useMemo(() => {
     if (filteredNodes) {
@@ -68,62 +78,50 @@ const _Relevance = ({ isSearchResult }: Props) => {
 
   return (
     <>
-      <ScrollView ref={scrollViewRef} id="search-result-list" shrink={1}>
-        {(currentNodes ?? []).map((n, index) => {
-          const {
-            image_url: imageUrl,
-            date,
-            boost,
-            type,
-            episode_title: episodeTitle,
-            show_title: showTitle,
-            node_type: nodeType,
-            text,
-            source_link: sourceLink,
-            link,
-            name,
-            verified = false,
-            twitter_handle: twitterHandle,
-          } = n || {}
+      {(currentNodes ?? []).map((n) => {
+        const adaptedNode = adaptTweetNode(n)
 
-          return (
-            <Episode
-              // eslint-disable-next-line react/no-array-index-key
-              key={index.toString()}
-              boostCount={boost || 0}
-              date={date || 0}
-              episodeTitle={formatDescription(episodeTitle)}
-              imageUrl={imageUrl || ''}
-              link={link}
-              name={name || ''}
-              onClick={() => {
-                handleNodeClick(n)
-              }}
-              showTitle={formatDescription(showTitle)}
-              sourceLink={sourceLink}
-              text={text || ''}
-              twitterHandle={twitterHandle}
-              type={nodeType || type}
-              verified={verified}
-            />
-          )
-        })}
+        const {
+          image_url: imageUrl,
+          date,
+          boost,
+          show_title: showTitle,
+          node_type: nodeType,
+          text,
+          source_link: sourceLink,
+          name,
+          verified = false,
+          twitter_handle: twitterHandle,
+        } = adaptedNode || {}
 
-        <LoadMoreWrapper align="center" background="BG1" direction="row" justify="center">
-          {hasNext && (
-            <Button
-              onClick={() => {
-                if (hasNext) {
-                  setCurrentPage(currentPage + 1)
-                }
-              }}
-              size="medium"
-            >
-              Load More
-            </Button>
-          )}
-        </LoadMoreWrapper>
-      </ScrollView>
+        return nodeType ? (
+          <Episode
+            key={adaptedNode.ref_id}
+            boostCount={boost || 0}
+            date={date || 0}
+            imageUrl={imageUrl || ''}
+            name={name || ''}
+            node={n}
+            onClick={() => {
+              handleNodeClick(n)
+            }}
+            showTitle={formatDescription(showTitle)}
+            sourceLink={sourceLink}
+            text={text || ''}
+            twitterHandle={twitterHandle}
+            type={nodeType}
+            verified={verified}
+          />
+        ) : null
+      })}
+
+      <LoadMoreWrapper align="center" background="BG1" direction="row" justify="center">
+        {hasNext && (
+          <Button key={buttonKey} onClick={handleLoadMoreClick} size="medium">
+            Load More
+          </Button>
+        )}
+      </LoadMoreWrapper>
     </>
   )
 }

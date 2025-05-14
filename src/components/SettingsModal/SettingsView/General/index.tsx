@@ -1,42 +1,71 @@
-import { FC } from 'react'
+import { Button } from '@mui/material'
+import { FC, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
+import { MdError } from 'react-icons/md'
 import { ClipLoader } from 'react-spinners'
 import styled from 'styled-components'
-import { Button } from '~/components/Button'
 import { Flex } from '~/components/common/Flex'
+import { SuccessNotify } from '~/components/common/SuccessToast'
 import { TextInput } from '~/components/common/TextInput'
-import { requiredRule } from '~/constants'
-import { TAboutParams, postAboutData } from '~/network/fetchSourcesData'
+import { NODE_ADD_ERROR, requiredRule } from '~/constants'
+import { postAboutData, TAboutParams } from '~/network/fetchSourcesData'
 import { useAppStore } from '~/stores/useAppStore'
+import { useUserStore } from '~/stores/useUserStore'
 import { colors } from '~/utils/colors'
 
 type Props = {
   initialValues: TAboutParams
+  onClose: () => void
 }
 
-export const General: FC<Props> = ({ initialValues }) => {
+export const General: FC<Props> = ({ initialValues, onClose }) => {
   const form = useForm<TAboutParams>({ defaultValues: initialValues, mode: 'onSubmit' })
   const { isSubmitting } = form.formState
   const setAppMetaData = useAppStore((s) => s.setAppMetaData)
+  const { swarmUiUrl } = useUserStore((s) => s)
+  const [error, setError] = useState<string>('')
 
   const onSubmit = form.handleSubmit(async (data) => {
     try {
       const res = (await postAboutData(data)) as Awaited<{ status: string }>
 
       if (res.status === 'success') {
+        SuccessNotify('Changes Saved')
         setAppMetaData(data)
+        onClose()
       }
-    } catch (error) {
-      console.log(error)
-      console.warn(error)
+      // eslint-disable-next-line  @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      let errorMessage = NODE_ADD_ERROR
+
+      if (err?.status === 400) {
+        const errorRes = await err.json()
+
+        errorMessage = errorRes.errorCode || errorRes?.status || NODE_ADD_ERROR
+      } else if (err instanceof Error) {
+        errorMessage = err.message
+      }
+
+      setError(String(errorMessage))
     }
   })
 
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onSubmit()
+  }
+
   return (
     <FormProvider {...form}>
-      <StyledForm id="add-node-form" onSubmit={onSubmit}>
-        <>
+      <StyledForm id="add-node-form" onSubmit={handleSubmit}>
+        <FormBody>
           <Flex>
+            {swarmUiUrl && (
+              <SwarmLinkContainer>
+                <Link href={swarmUiUrl}>View Swarm UI</Link>
+              </SwarmLinkContainer>
+            )}
+
             <Flex pt={20}>
               <TextInput
                 id="cy-about-title-id"
@@ -59,33 +88,110 @@ export const General: FC<Props> = ({ initialValues }) => {
               />
             </Flex>
           </Flex>
-          <Flex mt={210} py={24}>
-            {isSubmitting ? (
-              <SubmitLoader>
-                <ClipLoader color={colors.white} size={20} />
-              </SubmitLoader>
-            ) : (
-              <Button disabled={isSubmitting} id="add-node-submit-cta" kind="big" type="submit">
-                Save Changes
-              </Button>
-            )}
+
+          <Flex mt={180} py={error ? 0 : 24}>
+            <Button
+              color="secondary"
+              disabled={isSubmitting}
+              id="add-node-submit-cta"
+              size="large"
+              startIcon={
+                isSubmitting && (
+                  <IconWrapper>
+                    <ClipLoader color={colors.lightGray} size={12} />
+                  </IconWrapper>
+                )
+              }
+              type="submit"
+              variant="contained"
+            >
+              Save Changes
+            </Button>
+            {error ? (
+              <StyledError>
+                <StyledErrorText>
+                  <MdError className="errorIcon" />
+                  <span>{error}</span>
+                </StyledErrorText>
+              </StyledError>
+            ) : null}
           </Flex>
-        </>
+        </FormBody>
       </StyledForm>
     </FormProvider>
   )
 }
 
-const SubmitLoader = styled(Flex).attrs({
-  align: 'center',
-  background: 'primaryButton',
-  borderRadius: 8,
-  justify: 'center',
-})`
-  padding: 16px 24px;
-  opacity: 0.5;
-`
-
 const StyledForm = styled.form`
   padding: 36px;
+  height: 100%;
+`
+
+const IconWrapper = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`
+
+const SwarmLinkContainer = styled(Flex)`
+  display: flex;
+  align-items: flex-end;
+`
+
+const FormBody = styled(Flex)`
+  display: flex;
+  direction: column;
+  justify-content: space-between;
+  height: 100%;
+`
+
+const Link = styled.a`
+  font-family: 'Barlow';
+  font-size: 16px;
+  color: ${colors.PRIMARY_BLUE};
+  text-decoration: underline;
+  font-weight: 500;
+`
+
+const StyledError = styled(Flex)`
+  display: flex;
+  align-items: center;
+  color: ${colors.primaryRed};
+  position: relative;
+  margin-top: 10px;
+`
+
+const StyledErrorText = styled(Flex)`
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+
+  .errorIcon {
+    display: block;
+    font-size: 13px;
+    min-height: 13px;
+    min-width: 13px;
+  }
+
+  span {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    padding-left: 4px;
+    font-size: 13px;
+    font-family: Barlow;
+    line-height: 18px;
+  }
 `

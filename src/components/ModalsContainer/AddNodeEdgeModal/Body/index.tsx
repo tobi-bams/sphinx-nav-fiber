@@ -2,9 +2,10 @@ import { Button } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { ClipLoader } from 'react-spinners'
+import styled from 'styled-components'
 import { Flex } from '~/components/common/Flex'
 import { getEdges, postEdgeType } from '~/network/fetchSourcesData'
-import { useSelectedNode } from '~/stores/useDataStore'
+import { useSelectedNode } from '~/stores/useGraphStore'
 import { useModal } from '~/stores/useModalStore'
 import { TEdge } from '~/types'
 import { colors } from '~/utils/colors'
@@ -45,7 +46,7 @@ export const Body = () => {
           setTopicEdge(edge)
         }
       } catch (error) {
-        console.log(error)
+        console.error(error)
       } finally {
         setTopicIsLoading(false)
       }
@@ -75,11 +76,6 @@ export const Body = () => {
           : { to: nodeFrom.ref_id, from: selectedToNode?.ref_id }),
       })
 
-      const { ref_id: id } = nodeFrom
-      const { ref_id: selectedId } = selectedToNode
-
-      console.log(id, selectedId)
-
       closeHandler()
     } catch (error) {
       console.warn(error)
@@ -94,11 +90,11 @@ export const Body = () => {
     <FormProvider {...form}>
       {topicIsLoading ? (
         <Flex align="center" my={24}>
-          <ClipLoader color={colors.BLUE_PRESS_STATE} size={24} />
+          <ClipLoader color={colors.lightGray} size={24} />
         </Flex>
       ) : (
         <TitleEditor
-          from={topicEdge ? topicEdge?.search_value : selectedNode?.name || ''}
+          from={topicEdge ?? selectedNode}
           isSwapped={isSwapped}
           onSelect={setSelectedToNode}
           selectedToNode={selectedToNode}
@@ -107,10 +103,23 @@ export const Body = () => {
           setSelectedType={setSelectedType}
         />
       )}
-      <Button color="secondary" disabled={submitDisabled} onClick={handleSave} size="large" variant="contained">
+      <CustomButton color="secondary" disabled={submitDisabled} onClick={handleSave} size="large" variant="contained">
         Confirm
-        {loading && <ClipLoader color={colors.BLUE_PRESS_STATE} size={10} />}
-      </Button>
+        {loading && (
+          <ClipLoaderWrapper>
+            <ClipLoader color={colors.lightGray} size={12} />
+          </ClipLoaderWrapper>
+        )}
+      </CustomButton>
     </FormProvider>
   )
 }
+
+const CustomButton = styled(Button)`
+  width: 293px !important;
+  margin: 0 0 10px auto !important;
+`
+
+const ClipLoaderWrapper = styled.span`
+  margin-top: 2px;
+`

@@ -1,17 +1,36 @@
+import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import { Alerts } from '~/components/Alerts'
 import { Flex } from '~/components/common/Flex'
 import { Text } from '~/components/common/Text'
 import { Stats } from '~/components/Stats'
+import { useAiSummaryStore } from '~/stores/useAiSummaryStore'
 import { useAppStore } from '~/stores/useAppStore'
+import { useDataStore } from '~/stores/useDataStore'
 import { colors } from '~/utils/colors'
 import { media } from '~/utils/media'
 
 export const AppBar = () => {
   const appMetaData = useAppStore((s) => s.appMetaData)
+  const { resetAiSummaryAnswer, setNewLoading } = useAiSummaryStore()
+  const { abortFetchData, resetGraph } = useDataStore((s) => s)
+  const navigate = useNavigate()
+
+  if (!appMetaData) {
+    return null
+  }
+
+  const handleLogoClick = () => {
+    setNewLoading(null)
+    abortFetchData()
+    resetGraph()
+    resetAiSummaryAnswer()
+    navigate('/')
+  }
 
   return (
     <Header>
-      <TitleWrapper>
+      <TitleWrapper onClick={handleLogoClick}>
         <>
           {appMetaData.title && (
             <Text className="title" color="white">
@@ -19,9 +38,10 @@ export const AppBar = () => {
             </Text>
           )}
         </>
-        <Text className="subtitle"> Second Brain</Text>
+        <Text className="subtitle">Second Brain</Text>
       </TitleWrapper>
-      <Stats />
+      {false && <Stats />}
+      <Alerts />
     </Header>
   )
 }
@@ -57,6 +77,7 @@ const TitleWrapper = styled.div`
     font-weight: 700;
     line-height: 16px; /* 72.727% */
     letter-spacing: 0.22px;
+    cursor: pointer;
   }
 
   .subtitle {
@@ -67,5 +88,7 @@ const TitleWrapper = styled.div`
     font-weight: 400;
     line-height: 16px;
     letter-spacing: 0.22px;
+    margin-left: 8px;
+    cursor: pointer;
   }
 `

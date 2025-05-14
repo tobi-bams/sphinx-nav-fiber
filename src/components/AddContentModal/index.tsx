@@ -4,6 +4,7 @@ import * as sphinx from 'sphinx-bridge'
 import { BaseModal } from '~/components/Modal'
 import {
   DOCUMENT,
+  GITHUB_REPOSITORY,
   isE2E,
   LINK,
   NODE_ADD_ERROR,
@@ -14,6 +15,7 @@ import {
   YOUTUBE_CHANNEL,
 } from '~/constants'
 import { api } from '~/network/api'
+import { useDataStore } from '~/stores/useDataStore'
 import { useModal } from '~/stores/useModalStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { sphinxBridge } from '~/testSphinxBridge'
@@ -21,7 +23,6 @@ import { SubmitErrRes } from '~/types'
 import { getLSat, payLsat, updateBudget } from '~/utils'
 import { SuccessNotify } from '../common/SuccessToast'
 import { BudgetStep } from './BudgetStep'
-import { LocationStep } from './LocationStep'
 import { SourceStep } from './SourceStep'
 import { validateSourceURL } from './SourceStep/utils'
 import { SourceTypeStep } from './SourceTypeStep'
@@ -39,6 +40,7 @@ const handleSubmitForm = async (
   data: FieldValues,
   sourceType: string,
   setBudget: (value: number | null) => void,
+  setRunningProjectId: (value: string) => void,
 ): Promise<void> => {
   const endPoint = isSource(sourceType) ? 'radar' : 'add_node'
 
@@ -48,7 +50,7 @@ const handleSubmitForm = async (
     body.media_url = data.source
     body.content_type = 'audio_video'
   } else if (sourceType === TWITTER_SOURCE) {
-    const regex = /(?:https?:\/\/)?(?:www\.)?twitter\.com\/\w+\/status\/\d+/s
+    const regex = /(?:https?:\/\/)?(?:www\.)?(twitter|x)\.com\/\w+\/status\/(\d+)/s
 
     if (regex.test(data.source)) {
       const idRegex = /\/status\/(\d+)/
@@ -80,7 +82,7 @@ const handleSubmitForm = async (
     } else {
       return
     }
-  } else if (sourceType === YOUTUBE_CHANNEL || sourceType === RSS) {
+  } else if (sourceType === YOUTUBE_CHANNEL || sourceType === RSS || sourceType === GITHUB_REPOSITORY) {
     body.source = data.source
     body.source_type = sourceType
   }
@@ -111,6 +113,12 @@ const handleSubmitForm = async (
       Authorization: lsatToken,
     })
 
+    await updateBudget(setBudget)
+
+    if (res.data.project_id) {
+      setRunningProjectId(res.data.project_id)
+    }
+
     if (res.error) {
       const { message } = res.error
 
@@ -121,8 +129,8 @@ const handleSubmitForm = async (
   } catch (err: any) {
     if (err.status === 402) {
       await payLsat(setBudget)
-      await updateBudget(setBudget)
-      await handleSubmitForm(data, sourceType, setBudget)
+
+      await handleSubmitForm(data, sourceType, setBudget, setRunningProjectId)
     } else {
       let errorMessage = NODE_ADD_ERROR
 
@@ -130,7 +138,7 @@ const handleSubmitForm = async (
         try {
           const errorRes = await err.json()
 
-          errorMessage = errorRes.message || NODE_ADD_ERROR
+          errorMessage = errorRes.message || errorRes.status || errorRes?.errorCode || NODE_ADD_ERROR
         } catch (parseError) {
           errorMessage = NODE_ADD_ERROR
         }
@@ -146,7 +154,8 @@ const handleSubmitForm = async (
 export const AddContentModal = () => {
   const [currentStep, setCurrentStep] = useState(0)
   const { close, visible } = useModal('addContent')
-  const [setBudget] = useUserStore((s) => [s.setBudget])
+  const { setBudget } = useUserStore((s) => s)
+  const { setRunningProjectId } = useDataStore((s) => s)
   const form = useForm<FormData>({ mode: 'onChange' })
   const { watch, setValue, reset } = form
   const [loading, setLoading] = useState(false)
@@ -164,15 +173,18 @@ export const AddContentModal = () => {
   const type = watch('inputType')
   const sourceValue = watch('source')
 
-  const longitude = watch('longitude')
-  const latitude = watch('latitude')
-
   const source = watch('source')
 
   const isValidSource = validateSourceURL(sourceValue)
 
   useEffect(() => {
-    setValue('inputType', getInputType(source))
+    const updateInputType = async () => {
+      const inputType = await getInputType(source)
+
+      setValue('inputType', inputType)
+    }
+
+    updateInputType()
   }, [source, setValue])
 
   const handleClose = () => {
@@ -180,7 +192,11 @@ export const AddContentModal = () => {
   }
 
   const onNextStep = () => {
-    setCurrentStep(currentStep + 1)
+    if (currentStep === 0) {
+      setCurrentStep(isSource(type) ? 1 : 2)
+    } else {
+      setCurrentStep(currentStep + 1)
+    }
   }
 
   const onPrevStep = () => {
@@ -191,7 +207,7 @@ export const AddContentModal = () => {
     setLoading(true)
 
     try {
-      await handleSubmitForm(data, type, setBudget)
+      await handleSubmitForm(data, type, setBudget, setRunningProjectId)
       SuccessNotify('Content Added')
       handleClose()
       // eslint-disable-next-line  @typescript-eslint/no-explicit-any
@@ -217,14 +233,8 @@ export const AddContentModal = () => {
       <FormProvider {...form}>
         <form id="add-node-form" onSubmit={onSubmit}>
           {currentStep === 0 && <SourceStep allowNextStep={isValidSource} onNextStep={onNextStep} type={type} />}
-          {currentStep === 1 && (
-            <>
-              {!isSource(type) ? (
-                <LocationStep form={form} latitude={latitude} longitude={longitude} onNextStep={onNextStep} />
-              ) : (
-                <SourceTypeStep onNextStep={onNextStep} onPrevStep={onPrevStep} type={type} value={sourceValue} />
-              )}
-            </>
+          {currentStep === 1 && isSource(type) && (
+            <SourceTypeStep onNextStep={onNextStep} onPrevStep={onPrevStep} type={type} value={sourceValue} />
           )}
           {currentStep === 2 && <BudgetStep error={error} loading={loading} onClick={() => null} type={type} />}
         </form>

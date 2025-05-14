@@ -2,25 +2,32 @@ import styled from 'styled-components'
 import { Avatar } from '~/components/common/Avatar'
 import { Flex } from '~/components/common/Flex'
 import { Text } from '~/components/common/Text'
+import { TypeBadge } from '~/components/common/TypeBadge'
 import { Guests, Node } from '~/types'
 import { colors } from '~/utils/colors'
 import { formatDescription } from '~/utils/formatDescription'
 import { TwitData } from './Tweet'
 
 const Wrapper = styled(Flex)(({ theme }) => ({
-  position: 'absolute',
-  top: '65px',
-  right: '55px',
   width: '300px',
-  pointerEvents: 'none',
-  background: colors.dashboardHeader,
+  pointerEvents: 'auto',
+  background: colors.BG3,
   boxShadow: '0px 1px 6px rgba(0, 0, 0, 0.1)',
   color: colors.primaryText1,
-  zIndex: 100,
+  maxHeight: '400px',
+  overflowY: 'auto',
   transition: 'opacity 0.6s',
   padding: theme.spacing(2, 3),
   [theme.breakpoints.down('sm')]: {
     padding: theme.spacing(1, 1.5),
+  },
+  '&::-webkit-scrollbar': {
+    width: '3px',
+  },
+  '&::-webkit-scrollbar-track': {
+    borderRadius: '8px',
+    margin: '8px',
+    overflowY: 'hidden',
   },
 }))
 
@@ -45,38 +52,24 @@ export const Tooltip = ({ node }: Props) => {
     label,
     text,
     type,
+    name,
     twitter_handle: twitterHandle,
+    image_url: imageUrl,
+    guests: guestArray,
   } = node
 
-  const guestArray = node.guests
+  const guests = guestArray && guestArray.length > 0
 
-  let guests = false
-  let isGuestArrObj = false
+  const isGuestArrObj = guests && typeof guestArray[0] === 'object'
 
-  if (guestArray) {
-    if (guestArray.length && guestArray[0] !== null) {
-      guests = true
-    }
+  let displayImageUrl = imageUrl
 
-    if (typeof guestArray[0] === 'object') {
-      isGuestArrObj = true
-    }
+  if (nodeType === 'guest' && !imageUrl) {
+    displayImageUrl = 'person_placeholder2.png'
   }
-
-  let imageUrl = node.image_url
 
   if (type === 'twitter_space') {
-    imageUrl = 'twitter_placeholder.png'
-  }
-
-  if (imageUrl == null) {
-    switch (nodeType) {
-      case 'guest':
-        imageUrl = 'person_placeholder2.png'
-        break
-      default:
-        imageUrl = 'noimage.jpeg'
-    }
+    displayImageUrl = 'twitter_placeholder.png'
   }
 
   if (nodeType === 'topic') {
@@ -90,73 +83,84 @@ export const Tooltip = ({ node }: Props) => {
       ) : (
         <>
           <Flex direction="row">
-            <Divider />
+            {displayImageUrl && <Divider />}
             <Flex align="flex-start" pb={12}>
-              <Text>{nodeType?.toUpperCase()}</Text>
+              <TypeBadge type={nodeType} />
             </Flex>
           </Flex>
 
           <Flex direction="row">
-            <Flex pr={12}>
-              <Avatar src={imageUrl} type="person" />
-            </Flex>
+            {displayImageUrl && (
+              <Flex pr={12}>
+                <Avatar src={displayImageUrl as string} type="person" />
+              </Flex>
+            )}
 
             <div>
-              {type === 'guest' ? (
+              {(name || label) && (
                 <Flex direction="column">
-                  <Text>{label}</Text>
-                  {text && (
-                    <Flex pt={4}>
-                      <Text color="primaryText1" kind="tiny">
-                        @{text}
-                      </Text>
-                    </Flex>
+                  {name ? (
+                    <Text>{name}</Text>
+                  ) : (
+                    <>
+                      <Text>{label}</Text>
+                      {text && (
+                        <Flex pt={4}>
+                          <Text color="primaryText1" kind="tiny">
+                            @{text}
+                          </Text>
+                        </Flex>
+                      )}
+                    </>
                   )}
                 </Flex>
-              ) : (
+              )}
+
+              {showTitle && (
                 <Text color="primaryText1" kind="tiny">
                   {showTitle}
                 </Text>
               )}
 
-              <Flex pt={4}>
-                {nodeType === 'clip' || (nodeType === 'episode' && <Text color="primaryText1">Episode</Text>)}
-
-                {nodeType === 'clip' ? (
-                  <Text as="div" kind="regularBold">
-                    {formatDescription(description)}
-                  </Text>
-                ) : (
+              {episodeTitle && (
+                <Flex pt={4}>
                   <Text color="primaryText1" kind="tiny">
                     {episodeTitle}
                   </Text>
-                )}
-              </Flex>
+                </Flex>
+              )}
 
-              <Flex pt={12}>
-                {nodeType === 'clip' && <Text color="primaryText1">Episode</Text>}
+              {description && (
+                <Flex pt={12}>
+                  <Text as="div" kind="regularBold">
+                    {formatDescription(description)}
+                  </Text>
+                </Flex>
+              )}
 
-                <Text color="primaryText1" kind="tiny">
-                  {nodeType === 'clip' ? episodeTitle : formatDescription(description)}
-                </Text>
-              </Flex>
+              {twitterHandle && (
+                <Flex pt={4}>
+                  <Text color="primaryText1" kind="tiny">
+                    @{twitterHandle}
+                  </Text>
+                </Flex>
+              )}
 
-              {guests && (
+              {guestArray && guestArray.length > 0 && (
                 <Flex pt={12}>
                   <Text color="primaryText1">People</Text>
                   <Flex pt={4}>
                     <Text color="primaryText1" kind="tiny">
-                      {isGuestArrObj
-                        ? (guestArray as Guests[])
-                            .map((guest) => {
-                              if (guest.name) {
-                                return guest.name
-                              }
-
-                              return `@${guest.twitter_handle}`
-                            })
-                            .join(', ')
-                        : guestArray?.join(', ')}
+                      {guests && (
+                        <Flex pt={12}>
+                          <Text>Guests:</Text>
+                          <Text>
+                            {isGuestArrObj
+                              ? (guestArray as Guests[]).map((guest) => `@${guest?.twitter_handle}`).join(', ')
+                              : guestArray.join(', ')}
+                          </Text>
+                        </Flex>
+                      )}
                     </Text>
                   </Flex>
                 </Flex>

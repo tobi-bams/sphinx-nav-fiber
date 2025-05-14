@@ -2,7 +2,7 @@ const { origin, host } = window.location
 
 const getUrlFormEnv = () => import.meta.env.VITE_APP_API_URL
 
-export const API_URL = getUrlFormEnv() || apiUrlFromSwarmHost() || 'https://knowledge-graph.sphinx.chat'
+export const API_URL = getUrlFormEnv() || apiUrlFromSwarmHost() || 'https://bitcoin.sphinx.chat'
 
 export function apiUrlFromSwarmHost(): string | undefined {
   // for swarm deployments, always point to "boltwall"
@@ -21,17 +21,15 @@ export function apiUrlFromSwarmHost(): string | undefined {
 
       url = `https://${finalHost}`
     }
-  } else if (originUrl === 'https://second-brain.sphinx.chat' || origin.includes('localhost')) {
-    url = 'https://knowledge-graph.sphinx.chat'
+  } else if (origin.includes('localhost')) {
+    url = 'https://bitcoin.sphinx.chat'
   }
 
   return `${url}/api`
 }
 
 export function removeApi(url: string) {
-  if (url.endsWith('/api')) {
-    return url.substring(0, url.length - 4)
-  }
+  const regex = /\/api$/
 
-  return url
+  return url.replace(regex, '')
 }

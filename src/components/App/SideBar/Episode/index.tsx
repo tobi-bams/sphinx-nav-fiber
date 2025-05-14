@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import { useGraphData } from '~/components/DataRetriever'
 import ChevronDownIcon from '~/components/Icons/ChevronDownIcon'
 import { Flex } from '~/components/common/Flex'
-import { useSelectedNode } from '~/stores/useDataStore'
+import { useSelectedNode } from '~/stores/useGraphStore'
 import { usePlayerStore } from '~/stores/usePlayerStore'
 import { NodeExtended } from '~/types'
 import { colors, videoTimeToSeconds } from '~/utils'
@@ -35,11 +35,12 @@ export const Episode = () => {
 
   const [selectedTimestamp, setSelectedTimestamp] = useState<NodeExtended | null>(null)
 
-  const [playingNode, setPlayingNodeLink, setPlayingTime, setIsSeeking] = usePlayerStore((s) => [
+  const [playingNode, setPlayingNodeLink, setPlayingTime, setIsSeeking, playingTime] = usePlayerStore((s) => [
     s.playingNode,
     s.setPlayingNodeLink,
     s.setPlayingTime,
     s.setIsSeeking,
+    s.playingTime,
   ])
 
   const selectedNodeTimestamps = useMemo(
@@ -48,7 +49,7 @@ export const Episode = () => {
   )
 
   const selectedNodeShow: NodeExtended | undefined = useMemo(
-    () => data?.nodes.find((i) => i.node_type === 'show' && i.show_title === selectedNode?.show_title),
+    () => data?.nodes.find((i: NodeExtended) => i.node_type === 'show' && i.show_title === selectedNode?.show_title),
     [data?.nodes, selectedNode],
   )
 
@@ -58,6 +59,14 @@ export const Episode = () => {
 
       if (playingNode && timestamp.link && playingNode?.link !== timestamp.link) {
         setPlayingNodeLink(timestamp.link)
+        setPlayingTime(0)
+        setIsSeeking(true)
+      } else if (!playingNode || playingNode?.link !== timestamp.link) {
+        if (timestamp.link !== undefined) {
+          setPlayingNodeLink(timestamp.link)
+          setPlayingTime(0)
+          setIsSeeking(true)
+        }
       }
 
       setPlayingTime(newTime)
@@ -72,6 +81,24 @@ export const Episode = () => {
       updateActiveTimestamp(selectedNodeTimestamps[0])
     }
   }, [selectedNodeTimestamps, selectedTimestamp, updateActiveTimestamp])
+
+  useEffect(() => {
+    if (selectedNodeTimestamps?.length) {
+      const currentTimestamp = selectedNodeTimestamps.find((timestamp) => {
+        if (!timestamp.timestamp) {
+          return false
+        }
+
+        const timestampSeconds = videoTimeToSeconds(timestamp.timestamp.split('-')[0])
+
+        return Math.abs(timestampSeconds - playingTime) < 1
+      })
+
+      if (currentTimestamp && currentTimestamp.ref_id !== selectedTimestamp?.ref_id) {
+        setSelectedTimestamp(currentTimestamp)
+      }
+    }
+  }, [playingTime, selectedNodeTimestamps, selectedTimestamp])
 
   if (!selectedNode) {
     return null
@@ -139,7 +166,7 @@ const Wrapper = styled(Flex)`
 
 const StyledSlide = styled(Slide)`
   && {
-    position: absolute;
+    position: sticky;
     left: 0;
     right: 0;
     bottom: 0;
