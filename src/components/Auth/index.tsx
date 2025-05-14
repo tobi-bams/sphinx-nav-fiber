@@ -127,6 +127,8 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
 
         await handleAuth()
 
+        console.log('Navigator', navigator)
+
         console.log('handleAuth triggered')
       } catch (error) {
         console.error(error)
