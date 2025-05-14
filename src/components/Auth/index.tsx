@@ -108,8 +108,10 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
   useEffect(() => {
     const init = async () => {
       console.log("About to check if we're in a webview")
+
       if (isWebView() || isE2E || isAndroid()) {
         console.log('We want to see if we are triggering handleAuth')
+
         try {
           if (isAndroid()) {
             // eslint-disable-next-line no-promise-executor-return
