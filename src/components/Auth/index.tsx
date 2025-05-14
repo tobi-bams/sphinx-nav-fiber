@@ -119,10 +119,10 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
       try {
         if (isAndroid()) {
           // eslint-disable-next-line no-promise-executor-return
-          await new Promise((r) => setTimeout(r, 5000))
-        }
+          await new Promise((r) => setTimeout(r, 10000))
 
-        await handleAuth()
+          await handleAuth()
+        }
 
         console.log('handleAuth triggered')
       } catch (error) {
