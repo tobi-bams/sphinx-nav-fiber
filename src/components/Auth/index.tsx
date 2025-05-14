@@ -107,6 +107,7 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
   // auth checker
   useEffect(() => {
     const init = async () => {
+      console.log("About to check if we're in a webview")
       if (isWebView() || isE2E || isAndroid()) {
         console.log('We want to see if we are triggering handleAuth')
         try {
