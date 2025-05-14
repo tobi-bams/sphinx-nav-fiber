@@ -37,11 +37,15 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
 
     let sphinxEnable
 
+    console.log('called handleAuth')
+
     try {
       if (!isE2E) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         sphinxEnable = await sphinx.enable()
+
+        console.log('Sphinx enable', sphinxEnable)
       } else {
         sphinxEnable = await sphinxBridge.enable()
       }
@@ -119,6 +123,8 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
         }
 
         await handleAuth()
+
+        console.log('handleAuth triggered')
       } catch (error) {
         console.error(error)
       }
