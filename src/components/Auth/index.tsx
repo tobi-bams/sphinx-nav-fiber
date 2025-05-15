@@ -11,7 +11,7 @@ import { useFeatureFlagStore } from '~/stores/useFeatureFlagStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { sphinxBridge } from '~/testSphinxBridge'
 import { updateBudget } from '~/utils'
-import { isAndroid } from '~/utils/isWebView'
+import { isAndroid, isWebView, isWindow } from '~/utils/isWebView'
 import { Splash } from '../App/Splash'
 
 export const AuthGuard = ({ children }: PropsWithChildren) => {
@@ -113,27 +113,23 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
     const init = async () => {
       console.log("About to check if we're in a webview")
 
-      // if (isWebView() || isE2E || isAndroid()) {
-      console.log('We want to see if we are triggering handleAuth')
+      if (isWebView() || isE2E || isAndroid() || isWindow()) {
+        console.log('We want to see if we are triggering handleAuth')
 
-      try {
-        if (isAndroid()) {
+        try {
+          if (isAndroid()) {
+            // eslint-disable-next-line no-promise-executor-return
+            await new Promise((r) => setTimeout(r, 10000))
+          }
+
           // eslint-disable-next-line no-promise-executor-return
           await new Promise((r) => setTimeout(r, 10000))
+
+          await handleAuth()
+        } catch (error) {
+          console.error(error)
         }
-
-        // eslint-disable-next-line no-promise-executor-return
-        await new Promise((r) => setTimeout(r, 10000))
-
-        await handleAuth()
-
-        console.log('User Agent:', navigator.userAgent, 'user vendor:', navigator.vendor)
-
-        console.log('handleAuth triggered')
-      } catch (error) {
-        console.error(error)
       }
-      // }
 
       await updateBudget(setBudget)
 
