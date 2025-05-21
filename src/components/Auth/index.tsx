@@ -117,7 +117,7 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
         console.log('We want to see if we are triggering handleAuth')
 
         try {
-          if (isAndroid()) {
+          if (isAndroid() || isWindow()) {
             // eslint-disable-next-line no-promise-executor-return
             await new Promise((r) => setTimeout(r, 10000))
           }
