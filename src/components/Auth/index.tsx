@@ -10,7 +10,6 @@ import { useDataStore } from '~/stores/useDataStore'
 import { useFeatureFlagStore } from '~/stores/useFeatureFlagStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { sphinxBridge } from '~/testSphinxBridge'
-import { updateBudget } from '~/utils'
 import { isAndroid, isWebView, isWindow } from '~/utils/isWebView'
 import { Splash } from '../App/Splash'
 
@@ -128,7 +127,7 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
         }
       }
 
-      await updateBudget(setBudget)
+      // await updateBudget(setBudget)
 
       await handleIsAdmin()
     }
