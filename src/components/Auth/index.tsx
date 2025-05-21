@@ -122,9 +122,6 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
             await new Promise((r) => setTimeout(r, 10000))
           }
 
-          // eslint-disable-next-line no-promise-executor-return
-          await new Promise((r) => setTimeout(r, 10000))
-
           await handleAuth()
         } catch (error) {
           console.error(error)
