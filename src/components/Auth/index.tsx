@@ -11,6 +11,7 @@ import { useFeatureFlagStore } from '~/stores/useFeatureFlagStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { sphinxBridge } from '~/testSphinxBridge'
 import { isAndroid, isWebView, isWindow } from '~/utils/isWebView'
+import { updateBudget } from '~/utils/setBudget'
 import { Splash } from '../App/Splash'
 
 export const AuthGuard = ({ children }: PropsWithChildren) => {
@@ -127,7 +128,13 @@ export const AuthGuard = ({ children }: PropsWithChildren) => {
         }
       }
 
-      // await updateBudget(setBudget)
+      try {
+        await updateBudget(setBudget)
+
+        console.log('We successfully set LSAT')
+      } catch (error) {
+        console.error('Error setting LSAT', error)
+      }
 
       await handleIsAdmin()
     }
